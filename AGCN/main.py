@@ -2,6 +2,7 @@ import os
 import time
 from tqdm import tqdm
 from sys import stdout
+from itertools import chain
 
 from config import get_config
 from datasets.ntu_rgb_d.constants import skeleton_edges, data_shape
@@ -52,18 +53,14 @@ def load_data(config):
         test_set = test_set.cache()
 
     if not config.no_shuffle:
-        training_set = training_set.shuffle(1000)
+        shuffle_buffer_size = training_samples or 1000
+        training_set = training_set.shuffle(shuffle_buffer_size)
 
     # Enable batching and prefetching
-    training_set = training_set.batch(config.batch_size, drop_remainder=True).prefetch(1)
-    test_set = test_set.batch(config.batch_size).prefetch(1)
+    training_set = training_set.batch(config.batch_size, drop_remainder=True).prefetch(tf.data.experimental.AUTOTUNE)
+    test_set = test_set.batch(config.batch_size, drop_remainder=True).prefetch(tf.data.experimental.AUTOTUNE)
 
     return training_set, test_set, training_samples, test_samples
-
-
-def create_learning_rate_scheduler(config):
-    values = [config.base_lr ** i for i in range(1, len(config.steps) + 2)]
-    return keras.optimizers.schedules.PiecewiseConstantDecay(config.steps, values)
 
 
 @tf.function
@@ -71,6 +68,7 @@ def train_single_batch(model, x, y_true, optimizer, loss_function):
     with tf.GradientTape() as tape:
         y_pred = model(x, training=True)
         loss = loss_function(y_true, y_pred)
+        loss += tf.reduce_sum(model.losses)
     gradients = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
     return y_pred, loss
@@ -79,12 +77,41 @@ def train_single_batch(model, x, y_true, optimizer, loss_function):
 @tf.function
 def test_single_batch(model, x, y_true, loss_function):
     y_pred = tf.nn.softmax(model(x, training=False))
-    return y_pred, loss_function(y_true, y_pred)
+    loss = loss_function(y_true, y_pred)
+    loss += tf.reduce_sum(model.losses)
+    return y_pred, loss
+
+
+class TrainingMetric:
+    def __init__(self, metric, name=None):
+        self.metric = metric
+        self._name = name
+
+    @property
+    def name(self):
+        if self._name is not None:
+            return self._name
+        return self.metric.name
+
+    @property
+    def value(self):
+        if isinstance(self.metric, keras.metrics.Metric):
+            return self.metric.result()
+        elif (isinstance(self.metric, tf.Variable) or isinstance(self.metric, tf.Tensor)) and tf.size(self.metric) == 1:
+            return float(self.metric.numpy())
+        raise ValueError("Invalid metric type")
+
+    def kv(self):
+        return self.name, self.value
+
+    def reset(self):
+        if isinstance(self.metric, keras.metrics.Metric):
+            return self.metric.reset_states()
 
 
 class ModelTraining:
     def __init__(self, config, model, train_set, validation_set, num_training_samples=None,
-                 num_validation_samples=None):
+                 num_validation_samples=None, optimizer=None, loss_function=None):
         self.config = config
         self.model = model
         self.train_set = train_set
@@ -96,28 +123,74 @@ class ModelTraining:
         self.log_path = os.path.join(self.config.log_path, self.training_id)
         self.check_point_path = os.path.join(self.config.checkpoint_path, self.training_id)
 
-    def _create_trace(self, logger, optimizer, loss_function):
-        for features_batch, y_true in self.train_set:
-            tf.summary.trace_on(graph=True)
-            train_single_batch(self.model, features_batch, y_true, optimizer, loss_function)
-            with logger.as_default():
-                tf.summary.trace_export("training_trace", step=0)
-            tf.summary.trace_off()
-            tf.summary.trace_on(graph=True)
-            test_single_batch(self.model, features_batch, y_true, loss_function)
-            with logger.as_default():
-                tf.summary.trace_export("testing_trace", step=0)
-            tf.summary.trace_off()
-            break
-
-    def start(self, optimizer=None, loss_function=None):
+        self.optimizer = optimizer
         if optimizer is None:
-            optimizer = keras.optimizers.SGD(learning_rate=self.config.base_lr, momentum=0.9, nesterov=True)
+            self.optimizer = keras.optimizers.SGD(learning_rate=self.config.base_lr, momentum=0.9, nesterov=True)
+        self.loss_function = loss_function
         if loss_function is None:
-            loss_function = keras.losses.CategoricalCrossentropy(from_logits=True)
+            self.loss_function = keras.losses.CategoricalCrossentropy(from_logits=True)
 
-        training_loss = keras.metrics.Mean("training_loss")
-        validation_loss = keras.metrics.Mean("validation_loss")
+        values = [config.base_lr ** i for i in range(1, len(config.steps) + 2)]
+        self.lr_scheduler = keras.optimizers.schedules.PiecewiseConstantDecay(config.steps, values)
+        self.best_checkpoints = []
+        self.max_checkpoints_to_keep = 5
+
+    def _create_trace(self, logger):
+        """
+        Create graph trace section in TensorBoard
+        :param logger: file writer
+        """
+        features_batch, y_true = next(iter(self.train_set))
+        tf.summary.trace_on(graph=True)
+        train_single_batch(self.model, features_batch, y_true, self.optimizer, self.loss_function)
+        with logger.as_default():
+            tf.summary.trace_export("training_trace", step=0)
+        tf.summary.trace_off()
+        tf.summary.trace_on(graph=True)
+        test_single_batch(self.model, features_batch, y_true, self.loss_function)
+        with logger.as_default():
+            tf.summary.trace_export("testing_trace", step=0)
+        tf.summary.trace_off()
+
+    def _learning_rate_scheduling(self, epoch):
+        """
+        Learning rate scheduling.
+        Currently, learning rate is divided by 10 at fixed epochs given by self.config.steps
+        :param epoch: Current epoch
+        """
+        new_learning_rate = self.lr_scheduler(epoch)
+        if self.optimizer.learning_rate != new_learning_rate:
+            keras.backend.set_value(self.optimizer.learning_rate, new_learning_rate)
+
+    def _maybe_create_checkpoint(self, accuracy: float, file_format_metrics: dict):
+        """
+        Keeps track of the n best checkpoints and removes old checkpoints with worse results
+        :param accuracy: metric for comparison (higher values will stay)
+        :param file_format_metrics: values that will be written to the file name
+        :return:
+        """
+
+        def _create_path(check_point_path: str, fmt: dict):
+            fmt = "__".join(f"{k}_{v}" for k, v in fmt)
+            return os.path.join(check_point_path, f"checkpoint__{fmt}.h5")
+
+        if len(self.best_checkpoints) >= self.max_checkpoints_to_keep and accuracy <= self.best_checkpoints[-1][0]:
+            return
+
+        self.best_checkpoints.append((accuracy, file_format_metrics))
+        self.best_checkpoints.sort(key=lambda x: x[0], reverse=True)
+        self.model.save(_create_path(self.check_point_path, file_format_metrics))
+
+        for cp in self.best_checkpoints[self.max_checkpoints_to_keep:]:
+            p = _create_path(self.check_point_path, cp[1])
+            os.remove(p)
+
+        self.best_checkpoints = self.best_checkpoints[:self.max_checkpoints_to_keep]
+
+    def create_metrics(self):
+        # TODO add precision/recall ... need to update tf/keras first
+        training_loss = keras.metrics.Mean(name="training_loss")
+        validation_loss = keras.metrics.Mean(name="validation_loss")
         training_metrics = [
             keras.metrics.CategoricalAccuracy(name="training_accuracy"),
             keras.metrics.TopKCategoricalAccuracy(name="training_top5_accuracy")
@@ -127,33 +200,46 @@ class ModelTraining:
             keras.metrics.TopKCategoricalAccuracy(name="validation_top5_accuracy")
         ]
 
-        metrics = [training_loss, *training_metrics, validation_loss, *validation_metrics]
-        metric_names = [metric.name for metric in metrics]
+        metrics = [TrainingMetric(m) for m in
+                   chain([training_loss], training_metrics, [validation_loss], validation_metrics)]
+        metrics.append(TrainingMetric(self.optimizer.learning_rate, "lr"))
 
+        return training_loss, validation_loss, training_metrics, validation_metrics, metrics
+
+    def start(self):
+        """
+        Create metrics and start training.
+        """
+
+        training_loss, validation_loss, training_metrics, validation_metrics, metrics = self.create_metrics()
+        metric_names = [m.name for m in metrics]
         logger = tf.summary.create_file_writer(self.log_path)
-        self._create_trace(logger, optimizer, loss_function)
+        self._create_trace(logger)
 
         num_batches = self.num_training_samples // self.config.batch_size if self.num_training_samples else None
         val_batches = self.num_validation_samples // self.config.batch_size if self.num_validation_samples else None
 
-        # TODO add learning rate scheduling
+        # TODO maybe try different types of learning rate scheduling (1cycle, ...)
         for epoch in range(self.config.epochs):
             print(f"Epoch {epoch + 1}:")
-            bar = keras.utils.Progbar(num_batches, stateful_metrics=metric_names)
+            self._learning_rate_scheduling(epoch)
 
             print("Train batches...")
+            bar = keras.utils.Progbar(num_batches, stateful_metrics=metric_names)
             step = 0
 
             for step, (features_batch, y_true) in enumerate(self.train_set):
 
                 if epoch == 0 and self.config.profiling:
                     if step == self.config.profiling_range[0]:
+                        # tf.profiler.warmup()  TODO keras 2.3
                         tf.profiler.experimental.start(self.log_path)
                     elif step == self.config.profiling_range[1]:
                         tf.profiler.experimental.stop()
 
                 # Forward and backward training pass
-                y_pred, loss = train_single_batch(self.model, features_batch, y_true, optimizer, loss_function)
+                y_pred, loss = train_single_batch(self.model, features_batch, y_true, self.optimizer,
+                                                  self.loss_function)
 
                 # Update training metrics
                 training_loss.update_state(loss)
@@ -161,25 +247,31 @@ class ModelTraining:
                     metric.update_state(y_true, y_pred)
 
                 # Update progress bar
-                bar.update(step, [(metric.name, metric.result()) for metric in [training_loss] + training_metrics])
+                bar.update(step, [metric.kv() for metric in metrics if metric.name.startswith("training")])
 
-            for features_batch, y_true in tqdm(self.validation_set, total=val_batches, leave=False, file=stdout):
-                y_pred, loss = test_single_batch(model, features_batch, y_true, loss_function)
+            for features_batch, y_true in tqdm(self.validation_set, desc="Validation", total=val_batches, leave=False,
+                                               file=stdout):
+                y_pred, loss = test_single_batch(model, features_batch, y_true, self.loss_function)
 
                 # Update validation metrics
                 validation_loss.update_state(loss)
                 for metric in validation_metrics:
                     metric.update_state(y_true, y_pred)
 
-            bar.update(step + 1, [(metric.name, metric.result()) for metric in metrics], finalize=True)
+            bar.update(step + 1, [metric.kv() for metric in metrics], finalize=True)
 
             with logger.as_default():
                 for metric in metrics:
-                    tf.summary.scalar(metric.name, metric.result(), step=epoch)
+                    tf.summary.scalar(metric.name, metric.value, step=epoch)
+
+            self._maybe_create_checkpoint(float(validation_metrics[0].result()), {
+                "val_accuracy": float(validation_metrics[0].result()),
+                "epoch": epoch
+            })
 
             # Reset metric states
             for metric in metrics:
-                metric.reset_states()
+                metric.reset()
 
 
 def train_model_old(config, train_set, test_set, num_training_samples, num_test_samples):
@@ -192,8 +284,11 @@ def train_model_old(config, train_set, test_set, num_training_samples, num_test_
                   metrics=["accuracy", "top_k_categorical_accuracy"])
     model.summary()
 
+    lr_scheduler = keras.optimizers.schedules.PiecewiseConstantDecay(config.steps, [config.base_lr ** i for i in
+                                                                                    range(1, len(config.steps) + 2)])
+
     callbacks = [
-        keras.callbacks.LearningRateScheduler(create_learning_rate_scheduler(config)),
+        keras.callbacks.LearningRateScheduler(lr_scheduler),
         keras.callbacks.TensorBoard(os.path.join(config.log_path, time.strftime("training_%Y_%m_%d-%H_%M_%S")),
                                     profile_batch="200,250"),
         keras.callbacks.ModelCheckpoint(os.path.join(config.checkpoint_path, "weights.{epoch:02d}.h5"),
@@ -208,8 +303,7 @@ if __name__ == "__main__":
     setattr(cf, "kernel_regularizer", keras.regularizers.l2(cf.weight_decay))
 
     graph = Graph(skeleton_edges, is_directed=True)
-    shape = (3, 300, 25, 2)
-    model = create_model(cf, graph, shape)
+    model = create_model(cf, graph, data_shape)
 
     training_procedure = ModelTraining(cf, model, *load_data(cf))
     training_procedure.start()

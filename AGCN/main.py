@@ -17,6 +17,8 @@ for physical_device in physical_devices:
     tf.config.experimental.set_memory_growth(physical_device, True)
 
 from tensorflow import keras
+from tensorflow.keras.mixed_precision import experimental as mixed_precision
+
 from model import create_model
 
 
@@ -84,10 +86,35 @@ def train_single_batch(model, x, y_true, optimizer, loss_function):
 
 
 @tf.function
+def train_single_batch_mp(model, x, y_true, optimizer, loss_function):
+    """
+    Training step for mixed precision policy using loss scale optimization.
+    Check loss and scaled_loss for nan/inf as mixed precision is prone to under-/overflow.
+    :param model: Model to train
+    :param x: features
+    :param y_true: ground truth labels
+    :param optimizer: optimizer to be used
+    :param loss_function: loss function to be used
+    :return: A tuple (label predictions, loss)
+    """
+    with tf.GradientTape() as tape:
+        y_pred = model(x, training=True)
+        loss = loss_function(y_true, y_pred)
+        loss += tf.cast(tf.reduce_sum(model.losses), loss.dtype)
+        loss = tf.debugging.check_numerics(loss, f"Loss ({loss.dtype}) = {loss}")
+        scaled_loss = optimizer.get_scaled_loss(loss)
+        scaled_loss = tf.debugging.check_numerics(scaled_loss, f"S.Loss ({scaled_loss.dtype}) = {scaled_loss}")
+    scaled_gradients = tape.gradient(scaled_loss, model.trainable_variables)
+    gradients = optimizer.get_unscaled_gradients(scaled_gradients)
+    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    return y_pred, loss
+
+
+@tf.function
 def test_single_batch(model, x, y_true, loss_function):
     y_pred = tf.nn.softmax(model(x, training=False))
     loss = loss_function(y_true, y_pred)
-    loss += tf.reduce_sum(model.losses)
+    loss += tf.cast(tf.reduce_sum(model.losses), loss.dtype)
     return y_pred, loss
 
 
@@ -139,6 +166,12 @@ class ModelTraining:
         self.optimizer = optimizer
         if optimizer is None:
             self.optimizer = keras.optimizers.SGD(learning_rate=self.config.base_lr, momentum=0.9, nesterov=True)
+
+        if self.config.policy.name == "mixed_float16":
+            # mixed precision: https://www.tensorflow.org/guide/mixed_precision
+            loss_scale = tf.mixed_precision.experimental.DynamicLossScale(1024)
+            self.optimizer = mixed_precision.LossScaleOptimizer(self.optimizer, loss_scale=loss_scale)
+
         self.loss_function = loss_function
         if loss_function is None:
             self.loss_function = keras.losses.CategoricalCrossentropy(from_logits=True)
@@ -148,14 +181,14 @@ class ModelTraining:
         self.best_checkpoints = []
         self.max_checkpoints_to_keep = 5
 
-    def _create_trace(self, logger):
+    def _create_trace(self, logger, train_batch_fun):
         """
         Create graph trace section in TensorBoard
         :param logger: file writer
         """
         features_batch, y_true = next(iter(self.train_set))
         tf.summary.trace_on(graph=True)
-        train_single_batch(self.model, features_batch, y_true, self.optimizer, self.loss_function)
+        train_batch_fun(self.model, features_batch, y_true, self.optimizer, self.loss_function)
         with logger.as_default():
             tf.summary.trace_export("training_trace", step=0)
         tf.summary.trace_off()
@@ -222,11 +255,12 @@ class ModelTraining:
         """
         Create metrics and start training.
         """
+        train_batch = train_single_batch_mp if self.config.policy.name == "mixed_float16" else train_single_batch
 
         training_loss, validation_loss, training_metrics, validation_metrics, metrics = self.create_metrics()
         metric_names = [m.name for m in metrics]
         logger = tf.summary.create_file_writer(self.log_path)
-        self._create_trace(logger)
+        self._create_trace(logger, train_batch)
 
         num_batches = self.num_training_samples // self.config.batch_size if self.num_training_samples else None
         val_batches = self.num_validation_samples // self.config.batch_size if self.num_validation_samples else None
@@ -250,8 +284,7 @@ class ModelTraining:
                         tf.profiler.experimental.stop()
 
                 # Forward and backward training pass
-                y_pred, loss = train_single_batch(self.model, features_batch, y_true, self.optimizer,
-                                                  self.loss_function)
+                y_pred, loss = train_batch(self.model, features_batch, y_true, self.optimizer, self.loss_function)
 
                 # Update training metrics
                 training_loss.update_state(loss)
@@ -309,8 +342,18 @@ def train_model_old(config, train_set, test_set, num_training_samples, num_test_
 
 if __name__ == "__main__":
     cf = get_config()
-    setattr(cf, "kernel_regularizer", keras.regularizers.l2(cf.weight_decay))
 
+    policy = mixed_precision.Policy(cf.dtype_policy)
+    mixed_precision.set_policy(policy)
+    print("Policy: %s" % policy.name)
+    print("Compute dtype: %s" % policy.compute_dtype)
+    print("Variable dtype: %s" % policy.variable_dtype)
+
+    # if cf.dtype_policy == "mixed_float16":
+    #     tf.debugging.enable_check_numerics()
+
+    setattr(cf, "kernel_regularizer", keras.regularizers.l2(cf.weight_decay))
+    setattr(cf, "policy", policy)
     graph = Graph(skeleton_edges, is_directed=True)
     model = create_model(cf, graph, data_shape)
 

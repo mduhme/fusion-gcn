@@ -67,7 +67,11 @@ class SpatialGraphConvolution(keras.layers.Layer):
         c1 = tf.reshape(tf.transpose(self.w_theta[k](x), perm=(0, 3, 1, 2)),
                         (batch_size, num_joints, -1))  # TODO switch reshape and transpose
         c2 = tf.reshape(self.w_phi[k](x), (batch_size, -1, num_joints))
-        c = tf.matmul(c1, c2) / tf.cast(tf.shape(c1)[-1], tf.float32)
+        # divide first matrix now to prevent overflow
+        c1 /= tf.cast(tf.shape(c1)[-1], c1.dtype)
+        c = tf.matmul(c1, c2)
+        # Original line (results in overflow with mixed precision):
+        # c = c / tf.cast(tf.shape(c1)[-1], c.dtype)
         c = tf.nn.softmax(c, axis=-2)
         x_out = tf.matmul(tf.reshape(x, (batch_size, -1, num_joints)), self.a[k] + self.b[k] + c)
         x_out = tf.reshape(x_out, tf.shape(x))

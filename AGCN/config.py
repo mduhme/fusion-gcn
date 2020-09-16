@@ -6,7 +6,8 @@ def get_config():
     parser = argparse.ArgumentParser(
         description="Spatial Temporal Graph Convolutional Neural Network for Skeleton-Based Action Recognition")
     parser.add_argument("--base_lr", default=0.1, type=float, help="Initial learning rate")
-    parser.add_argument("--batch_size", default=10, type=int, help="Batch size for training")
+    parser.add_argument("--batch_size", default=24, type=int,
+                        help="Batch size for training. For policy 'mixed_float16' should be a multiple of 8.")
     parser.add_argument("--epochs", default=50, type=int, help="Number of epochs")
     parser.add_argument("--num_classes", default=60, type=int, help="Number of classes for the dataset")
     parser.add_argument("--dropout", default=0.5, type=float, help="Neural network dropout")
@@ -18,6 +19,9 @@ def get_config():
     parser.add_argument("--profiling", action="store_true", help="Enable profiling for TensorBoard")
     parser.add_argument("--profiling_range", default=[200, 250], type=int, nargs="+", help="Steps for profiling")
     parser.add_argument("--strategy", type=str, default="spatial", help="Graph partition strategy")
+    parser.add_argument("--dtype_policy", type=str, default="mixed_float16",
+                        help="Type policy to be used. Enable mixed precision with 'mixed_float16'.",
+                        choices=("float32", "mixed_float16"))
     parser.add_argument("--in_path", type=str, required=True, help="Path to tf record files for training")
     parser.add_argument("--out_path", type=str, required=True,
                         help="Path where trained models temporary results / checkpoints will be stored")

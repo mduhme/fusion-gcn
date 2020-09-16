@@ -27,8 +27,7 @@ class SpatialGraphConvolution(keras.layers.Layer):
         self.num_subsets = int(tf.shape(adjacency_matrix)[0].numpy())
 
         self.a = adjacency_matrix  # Adjacency matrix A_k
-        self.b = self.add_weight("Adjacency Matrix B[k]", tf.shape(adjacency_matrix), tf.float32,
-                                 keras.initializers.Constant(1e-6))
+        self.b = None  # Initialize in build to create unique name
 
         branch_conv_init = keras.initializers.VarianceScaling(scale=2. / self.num_subsets, mode="fan_out")
         num_inter_channels = num_filters // 4  # Why 4 is not explained in paper/code.
@@ -58,6 +57,10 @@ class SpatialGraphConvolution(keras.layers.Layer):
                                                  kernel_initializer=INITIALIZER,
                                                  kernel_regularizer=config.kernel_regularizer)
             self.down_bn = keras.layers.BatchNormalization(axis=1)
+
+    def build(self, input_shape):
+        self.b = self.add_weight(name="adjacency_matrix_b", shape=tf.shape(self.a),
+                                 initializer=keras.initializers.Constant(1e-6))
 
     def _sum_iteration(self, x, k):
         batch_size, num_channels, num_frames, num_joints = tf.unstack(tf.shape(x))

@@ -65,6 +65,15 @@ def load_data(config):
 
 @tf.function
 def train_single_batch(model, x, y_true, optimizer, loss_function):
+    """
+    Default training step (for float32 precision).
+    :param model: Model to train
+    :param x: features
+    :param y_true: ground truth labels
+    :param optimizer: optimizer to be used
+    :param loss_function: loss function to be used
+    :return: A tuple (label predictions, loss)
+    """
     with tf.GradientTape() as tape:
         y_pred = model(x, training=True)
         loss = loss_function(y_true, y_pred)
@@ -122,6 +131,10 @@ class ModelTraining:
         self.training_id = time.strftime("training_%Y_%m_%d-%H_%M_%S")
         self.log_path = os.path.join(self.config.log_path, self.training_id)
         self.check_point_path = os.path.join(self.config.checkpoint_path, self.training_id)
+        if not os.path.exists(self.check_point_path):
+            os.makedirs(self.check_point_path)
+
+        # TODO store config in log dir for reproduction
 
         self.optimizer = optimizer
         if optimizer is None:
@@ -162,27 +175,26 @@ class ModelTraining:
         if self.optimizer.learning_rate != new_learning_rate:
             keras.backend.set_value(self.optimizer.learning_rate, new_learning_rate)
 
-    def _maybe_create_checkpoint(self, accuracy: float, file_format_metrics: dict):
+    def _maybe_create_checkpoint(self, accuracy: float, epoch: int):
         """
         Keeps track of the n best checkpoints and removes old checkpoints with worse results
         :param accuracy: metric for comparison (higher values will stay)
-        :param file_format_metrics: values that will be written to the file name
+        :param epoch: epoch will be written to the file name
         :return:
         """
 
-        def _create_path(check_point_path: str, fmt: dict):
-            fmt = "__".join(f"{k}_{v}" for k, v in fmt)
-            return os.path.join(check_point_path, f"checkpoint__{fmt}.h5")
+        def _create_path(check_point_path: str, acc: float, ep: int):
+            return os.path.join(check_point_path, "checkpoint_{0:0>2}_{1:.4f}.h5".format(ep, acc))
 
         if len(self.best_checkpoints) >= self.max_checkpoints_to_keep and accuracy <= self.best_checkpoints[-1][0]:
             return
 
-        self.best_checkpoints.append((accuracy, file_format_metrics))
+        self.best_checkpoints.append((accuracy, epoch))
         self.best_checkpoints.sort(key=lambda x: x[0], reverse=True)
-        self.model.save(_create_path(self.check_point_path, file_format_metrics))
+        self.model.save(_create_path(self.check_point_path, accuracy, epoch))
 
         for cp in self.best_checkpoints[self.max_checkpoints_to_keep:]:
-            p = _create_path(self.check_point_path, cp[1])
+            p = _create_path(self.check_point_path, *cp)
             os.remove(p)
 
         self.best_checkpoints = self.best_checkpoints[:self.max_checkpoints_to_keep]
@@ -264,10 +276,7 @@ class ModelTraining:
                 for metric in metrics:
                     tf.summary.scalar(metric.name, metric.value, step=epoch)
 
-            self._maybe_create_checkpoint(float(validation_metrics[0].result()), {
-                "val_accuracy": float(validation_metrics[0].result()),
-                "epoch": epoch
-            })
+            self._maybe_create_checkpoint(float(validation_metrics[0].result()), epoch)
 
             # Reset metric states
             for metric in metrics:

@@ -127,12 +127,22 @@ class Graph:
         plt.scatter(range(self.num_vertices), l)
         plt.show()
 
+    def get_k_walk_connections(self, k, add_self_connections=False, labels=None):
+        a = self.get_adjacency_matrix()
+        if add_self_connections:
+            a += np.eye(a.shape[0], dtype=a.dtype)
+        ak = np.linalg.matrix_power(a, k)
+        res = np.transpose(ak.nonzero())
+        if labels is None:
+            return ak, res
+        return ak, [(labels[a], labels[b], ak[a, b]) for a, b in res]
+
     def __str__(self):
         return f"A =\n{self.get_adjacency_matrix()}\nD = {self.get_degree_matrix(False)}\nL =\n" \
                f"{self.get_laplacian_matrix()}\n"
 
 
-def normalize_adjacency_matrix_undirected(adj: np.ndarray):
+def normalize_adjacency_matrix_undirected(adj: np.ndarray) -> np.ndarray:
     adj = adj.astype(np.float) + np.eye(adj.shape[0])
     d = np.sum(adj, axis=0)
     d_inv_sqrt = np.power(d, -0.5)
@@ -141,9 +151,20 @@ def normalize_adjacency_matrix_undirected(adj: np.ndarray):
     return adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt)
 
 
-def normalize_adjacency_matrix_directed(adj: np.ndarray):
+def normalize_adjacency_matrix_directed(adj: np.ndarray) -> np.ndarray:
     adj = adj.astype(np.float) + np.eye(adj.shape[0])
     d = np.sum(adj, axis=0)
     d_inv_sqrt = np.power(d, -1)
     d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.
     return adj.dot(np.diag(d_inv_sqrt))
+
+
+def get_k_adjacency(adj: np.ndarray, k: int, with_self: bool = False, self_factor: int = 1) -> np.ndarray:
+    identity = np.eye(len(adj), dtype=adj.dtype)
+    if k == 0:
+        return identity
+    adj_k = np.minimum(np.linalg.matrix_power(adj + identity, k), 1) - \
+            np.minimum(np.linalg.matrix_power(adj + identity, k - 1), 1)
+    if with_self:
+        adj_k += (self_factor * identity)
+    return adj_k

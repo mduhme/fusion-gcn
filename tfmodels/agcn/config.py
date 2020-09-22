@@ -4,7 +4,7 @@ import os
 
 def get_config():
     parser = argparse.ArgumentParser(
-        description="Spatial Temporal Graph Convolutional Neural Network for Skeleton-Based Action Recognition")
+        description="Adaptive Graph Convolutional Neural Network for Skeleton-Based Action Recognition")
     parser.add_argument("--base_lr", default=0.1, type=float, help="Initial learning rate")
     parser.add_argument("--batch_size", default=10, type=int, help="Batch size for training")
     parser.add_argument("--epochs", default=50, type=int, help="Number of epochs")

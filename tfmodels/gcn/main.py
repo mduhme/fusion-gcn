@@ -5,8 +5,8 @@ for physical_device in physical_devices:
     tf.config.experimental.set_memory_growth(physical_device, True)
 
 from tensorflow import keras
-from GCN.utils import *
-from GCN.layers import GraphConvolution
+from tfmodels.gcn.utils import *
+from tfmodels.gcn.layers import GraphConvolution
 import argparse
 
 seed = 123

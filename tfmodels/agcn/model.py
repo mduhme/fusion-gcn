@@ -1,7 +1,7 @@
 from tensorflow import keras
 
-from partition_strategy import GraphPartitionStrategy
-from layer import GraphConvolutionSequenceLayer
+from util.partition_strategy import GraphPartitionStrategy
+from tfmodels.agcn.layer import GraphConvolutionSequenceLayer
 
 
 def create_model(config, graph, input_shape):

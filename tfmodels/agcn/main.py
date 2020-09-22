@@ -4,7 +4,7 @@ from tqdm import tqdm
 from sys import stdout
 from itertools import chain
 
-from config import get_config
+from tfmodels.agcn.config import get_config
 from datasets.ntu_rgb_d.constants import skeleton_edges, data_shape
 from util.graph import Graph
 
@@ -17,7 +17,7 @@ for physical_device in physical_devices:
     tf.config.experimental.set_memory_growth(physical_device, True)
 
 from tensorflow import keras
-from model import create_model
+from tfmodels.agcn.model import create_model
 
 
 def load_data(config):
@@ -143,8 +143,9 @@ class ModelTraining:
         if loss_function is None:
             self.loss_function = keras.losses.CategoricalCrossentropy(from_logits=True)
 
+        steps = np.array(config.steps) - 2
         values = [config.base_lr ** i for i in range(1, len(config.steps) + 2)]
-        self.lr_scheduler = keras.optimizers.schedules.PiecewiseConstantDecay(config.steps, values)
+        self.lr_scheduler = keras.optimizers.schedules.PiecewiseConstantDecay(steps, values)
         self.best_checkpoints = []
         self.max_checkpoints_to_keep = 5
 
@@ -154,11 +155,13 @@ class ModelTraining:
         :param logger: file writer
         """
         features_batch, y_true = next(iter(self.train_set))
+        print("Create training trace graph")
         tf.summary.trace_on(graph=True)
         train_single_batch(self.model, features_batch, y_true, self.optimizer, self.loss_function)
         with logger.as_default():
             tf.summary.trace_export("training_trace", step=0)
         tf.summary.trace_off()
+        print("Create testing trace graph")
         tf.summary.trace_on(graph=True)
         test_single_batch(self.model, features_batch, y_true, self.loss_function)
         with logger.as_default():
@@ -200,7 +203,6 @@ class ModelTraining:
         self.best_checkpoints = self.best_checkpoints[:self.max_checkpoints_to_keep]
 
     def create_metrics(self):
-        # TODO add precision/recall ... need to update tf/keras first
         training_loss = keras.metrics.Mean(name="training_loss")
         validation_loss = keras.metrics.Mean(name="validation_loss")
         training_metrics = [
@@ -231,6 +233,7 @@ class ModelTraining:
         num_batches = self.num_training_samples // self.config.batch_size if self.num_training_samples else None
         val_batches = self.num_validation_samples // self.config.batch_size if self.num_validation_samples else None
 
+        # TODO add timer to print after each epoch
         # TODO maybe try different types of learning rate scheduling (1cycle, ...)
         for epoch in range(self.config.epochs):
             print(f"Epoch {epoch + 1}:")

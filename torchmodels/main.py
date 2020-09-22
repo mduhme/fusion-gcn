@@ -1,5 +1,6 @@
 import os
 import time
+from typing import Tuple
 import locale
 
 locale.setlocale(locale.LC_ALL, "")
@@ -11,6 +12,7 @@ import torch.nn as nn
 import torch.backends.cudnn as cudnn
 from torch.utils.data import DataLoader
 from torch.autograd.profiler import profile
+from torch.cuda.amp import autocast, GradScaler
 
 from util.graph import Graph
 from util.dynamic_import import import_model
@@ -43,7 +45,7 @@ class Session:
     def __init__(self, config):
         self._config = config
         self._session_type = "profiling" if self._config.profiling else (self._config.session_type or "training")
-        id_fmt = f"{self._session_type}_session_%Y_%m_%d-%H_%M_%S_torch{torch.version.__version__}"
+        id_fmt = f"{self._session_type}_%Y_%m_%d-%H_%M_%S_torch{torch.version.__version__}"
         self._session_id = time.strftime(id_fmt)
         if self._config.debug and not self._config.profiling:
             self._session_id = "debug_" + self._session_id
@@ -53,6 +55,12 @@ class Session:
             self._batch_fun = self._single_batch
         else:
             self._batch_fun = self._single_batch_accum
+        if self._config.mixed_precision:
+            self._forward = self._amp_forward
+            self._loss_scale = GradScaler()
+        else:
+            self._forward = self._default_forward
+            self._loss_scale = None
         self._model = None
         self._loss_function = None
         self._optimizer = None
@@ -64,17 +72,16 @@ class Session:
         self._metrics = None
         self._progress = None
 
-    def initialize_model(self):
+    def _initialize_model(self):
         graph = Graph(skeleton_edges)
         # https://pytorch.org/docs/stable/generated/torch.nn.Module.html
         # noinspection PyPep8Naming
         Model = import_model(self._config.model)
         self._model = Model(data_shape, num_classes, graph).cuda()
         self._loss_function = nn.CrossEntropyLoss().cuda()
-        # TODO add 'nesterov' as config value
         # TODO set default optimizer, maybe load optimizer from checkpoint if given
         self._optimizer = torch.optim.SGD(self._model.parameters(), lr=self._config.base_lr, momentum=0.9,
-                                          nesterov=True,
+                                          nesterov=self._config.nesterov,
                                           weight_decay=self._config.weight_decay)
         self._lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(self._optimizer, milestones=self._config.steps,
                                                                   gamma=0.1)
@@ -83,8 +90,7 @@ class Session:
         """
         Start training or validation based on session type.
         """
-        if self._model is None:
-            self.initialize_model()
+        self._initialize_model()
         self._load_data()
         self.print_summary()
 
@@ -113,12 +119,14 @@ class Session:
         print("PyTorch", torch.version.__version__, "CUDA", torch.version.cuda)
         print("Session ID:", self._session_id)
         print("Session Type:", self._session_type)
+        if self._config.fixed_seed is not None:
+            print("Fixed seed:", self._config.fixed_seed)
         print("Model:", self._config.model.upper())
-        print(f"Model - Trainable parameters: {num_trainable_params:n}")
-        print(f"Model - Total parameters: {num_total_params:n}")
+        print(f"Model - Trainable parameters: {num_trainable_params:n} | Total parameters: {num_total_params:n}")
         print("Batch size:", self._config.batch_size)
         print("Gradient accumulation step size:", self._config.grad_accum_step)
         print("Test batch size:", self._config.test_batch_size)
+        print("Mixed precision:", self._config.mixed_precision)
         if self._session_type == "training":
             print(f"Training batches: {self._num_training_batches:n}")
         print(f"Evaluation batches: {self._num_validation_batches:n}")
@@ -133,7 +141,7 @@ class Session:
         self._progress = ProgressLogger(self.log_path, self._config.epochs, modes=[
             ("training", self._num_training_batches),
             ("validation", self._num_validation_batches)
-        ])
+        ], tensorboard=not self._config.debug)
         self._metrics = MetricsContainer([
             MultiClassAccuracy("training_accuracy"),
             MultiClassAccuracy("validation_accuracy"),
@@ -151,16 +159,17 @@ class Session:
         Load validation and training data (if session type is training).
         """
         if self._session_type == "training":
+            shuffle = not (self._config.no_shuffle or self._config.debug)
             self._data_loader["train"] = DataLoader(
                 NumpyDataset(self._config.training_features_path, self._config.training_labels_path,
-                             self._config.debug), self._config.batch_size, shuffle=True,
-                drop_last=True, worker_init_fn=set_seed if self._config.debug else None)
+                             self._config.debug), self._config.batch_size, shuffle=shuffle,
+                drop_last=True, worker_init_fn=set_seed if self._config.fixed_seed is not None else None)
             self._num_training_batches = len(self._data_loader["train"])
 
         self._data_loader["val"] = DataLoader(
             NumpyDataset(self._config.validation_features_path, self._config.validation_labels_path),
             self._config.test_batch_size, shuffle=False, drop_last=False,
-            worker_init_fn=set_seed if self._config.debug else None)
+            worker_init_fn=set_seed if self._config.fixed_seed is not None else None)
         self._num_validation_batches = len(self._data_loader["val"])
 
     def _save_checkpoint(self):
@@ -190,18 +199,31 @@ class Session:
         print(wrap_color("\rStart profiling... Done.", 31))
         print(wrap_color(prof.key_averages().table(sort_by="cuda_time_total"), 31))
 
+    def _default_forward(self, features: torch.Tensor, label: torch.Tensor, loss_scale: int = 1):
+        y_pred = self._model(features)
+        loss = self._loss_function(y_pred, label) / loss_scale
+        return y_pred, loss
+
+    def _amp_forward(self, features: torch.Tensor, label: torch.Tensor, loss_scale: int = 1):
+        with autocast():
+            return self._default_forward(features, label, loss_scale)
+
+    def _backward(self, loss: torch.Tensor):
+        if self._config.mixed_precision:
+            self._loss_scale.scale(loss).backward()
+        else:
+            loss.backward()
+
     def _single_batch(self, features: torch.Tensor, label: torch.Tensor):
         """
         Compute and calculate the loss for a single batch. If training, propagate the loss to all parameters.
         :param features: features tensor of len batch_size
         :param label: label tensor of len batch_size
         """
-        y_pred = self._model(features)
-        loss = self._loss_function(y_pred, label)
+        y_pred, loss = self._forward(features, label)
 
         if self._model.training:
-            # TODO mixed precision scaled loss
-            loss.backward()
+            self._backward(loss)
             # update online mean loss and metrics
             update_metrics = self._metrics.update_training
         else:
@@ -220,12 +242,10 @@ class Session:
             start = step * self._config.grad_accum_step
             end = start + self._config.grad_accum_step
             x, y_true = features[start:end], label[start:end]
-            y_pred = self._model(x)
-            loss = self._loss_function(y_pred, y_true) / len(y_true)
+            y_pred, loss = self._forward(x, y_true, len(y_true))
 
             if self._model.training:
-                # TODO mixed precision scaled loss
-                loss.backward()
+                self._backward(loss)
 
                 # update online mean loss and metrics
                 update_metrics = self._metrics.update_training
@@ -250,7 +270,11 @@ class Session:
             # Compute model and calculate loss
             self._batch_fun(features, label)
             # Update weights
-            self._optimizer.step()
+            if self._config.mixed_precision:
+                self._loss_scale.step(self._optimizer)
+                self._loss_scale.update()
+            else:
+                self._optimizer.step()
             # Update progress bar
             self._progress.update_epoch_mode(0, metrics=self._metrics.format_training())
 
@@ -273,7 +297,8 @@ class Session:
         # https://discuss.pytorch.org/t/proper-way-of-fixing-batchnorm-layers-during-training/13214/3
         # https://medium.com/analytics-vidhya/effect-of-batch-size-on-training-process-and-results-by-gradient-accumulation-e7252ee2cb3f
         # https://towardsdatascience.com/what-is-gradient-accumulation-in-deep-learning-ec034122cfa?gi=ac2bf65a793c
-        # TODO implement amp mixed precision
+        # TODO implement amp mixed precision https://pytorch.org/docs/stable/amp.html
+        # https://pytorch.org/docs/stable/notes/amp_examples.html#amp-examples
 
         for epoch in range(self._config.epochs):
             # Begin epoch
@@ -299,8 +324,8 @@ class Session:
 
 if __name__ == "__main__":
     cf = get_configuration()
-    if cf.debug:
-        set_seed(1)
+    if cf.fixed_seed is not None:
+        set_seed(cf.fixed_seed)
 
     session = Session(cf)
     session.start()

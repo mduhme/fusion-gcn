@@ -1,8 +1,6 @@
 import numpy as np
 import os
-from scipy.spatial.transform import Rotation
-from tqdm import tqdm
-from typing import Tuple
+from typing import List
 
 from datasets.utd_mhad.constants import *
 
@@ -23,7 +21,7 @@ class FileMetaData:
         return os.path.splitext(os.path.basename(self.file_name))[0]
 
 
-def get_file_meta_data(file_name: str):
+def parse_file_name(file_name: str):
     m = file_matcher.fullmatch(os.path.basename(file_name))
     action_idx, subject_idx, trial_idx = m.groups()
     action_idx = int(action_idx) - 1
@@ -32,11 +30,12 @@ def get_file_meta_data(file_name: str):
     return FileMetaData(file_name, subject_idx, trial_idx, action_idx)
 
 
-def read_mod_dir(p, read_data_fn):
-    return [get_file_meta_data(p, f, read_data_fn) for f in tqdm(os.listdir(p), f"Read files in {p}") if f.endswith(".mat")]
+def get_files(data_path: str):
+    files = [os.path.join(data_path, file.name) for file in os.scandir(data_path) if file.is_file()]
+    return [parse_file_name(fn) for fn in files if os.path.splitext(fn)[1] in (".mat", ".avi")]
 
 
-def get_skeleton_files(unprocessed_skeleton_data_path: str):
-    skeleton_files = [file.name for file in os.scandir(unprocessed_skeleton_data_path) if file.is_file()]
-    return [parse_skeleton_file_name(unprocessed_skeleton_data_path, fn, sample_properties_matcher) for fn in
-            filtered_skeleton_files]
+def split_set(file_list: List[FileMetaData]):
+    training_set = [f for f in file_list if f.subject in training_subjects]
+    validation_set = [f for f in file_list if f.subject in test_subjects]
+    return training_set, validation_set

@@ -1,9 +1,10 @@
+import os
 from datetime import datetime, timedelta
 from sys import stdout
 from timeit import default_timer
 from typing import Tuple, List
-import webbrowser
 
+import torch
 from torch.utils.tensorboard import SummaryWriter
 from tensorboard.program import TensorBoard
 
@@ -34,18 +35,15 @@ def wrap_info(msg: str, ts: bool = True) -> str:
     return wrap_color(ts_fmt + msg, BLUE)
 
 
-def launch_tensorboard(log_path: str, open_browser: bool = True) -> str:
+def launch_tensorboard(log_path: str) -> str:
     """
     Launch tensorboard at given log path.
     :param log_path: log path
-    :param open_browser: whether to open tensorboard url in default browser
     :return: tensorboard url
     """
     tb = TensorBoard()
     tb.configure((None, "--logdir", log_path))
     url = tb.launch()
-    if open_browser:
-        webbrowser.open(url)
     return url
 
 
@@ -193,3 +191,69 @@ class ProgressLogger:
                                      f"{self._modes_total[i]} {elapsed}s {seconds_per_step:.3f}s/step"
                 self._modes_fmt[i] = wrap_color(self._modes_fmt[i], PURPLE)
         self._modes_timer[mode].start()
+
+
+class CheckpointManager:
+    def __init__(self, checkpoint_path: str, state_dict_objects: dict):
+        self.checkpoint_path = checkpoint_path
+        self.state_dict_objects = state_dict_objects
+
+    def save_checkpoint(self, epoch: int, val_acc: float, **additional_objects: dict):
+        os.makedirs(self.checkpoint_path, exist_ok=True)
+
+        state_dicts = {k: v.state_dict() for k, v in self.state_dict_objects.items()}
+        state_dicts = {**state_dicts, **additional_objects, "epoch": epoch}
+
+        out_file = os.path.join(self.checkpoint_path, f"checkpoint_{epoch}_{val_acc:.2}.pt")
+        torch.save(state_dicts, out_file)
+
+    def save_weights(self, model: torch.nn.Module, file_name_prefix: str = ""):
+        os.makedirs(self.checkpoint_path, exist_ok=True)
+        if file_name_prefix:
+            file_name_prefix += "_"
+        out_file = os.path.join(self.checkpoint_path, f"{file_name_prefix}weights.pt")
+        torch.save(model.state_dict(), out_file)
+
+    def load_weights(self, model: torch.nn.Module, file_name_prefix: str = ""):
+        if file_name_prefix:
+            file_name_prefix += "_"
+        in_file = os.path.join(self.checkpoint_path, f"{file_name_prefix}weights.pt")
+        cp = torch.load(in_file)
+        model.load_state_dict(cp)
+
+    def load_best(self, apply: bool = True) -> dict:
+        return self._load(CheckpointManager._get_acc, apply)
+
+    def load_latest(self, apply: bool = True) -> dict:
+        return self._load(CheckpointManager._get_epoch, apply)
+
+    def _apply_checkpoint(self, cp: dict):
+        for object_name, obj in self.state_dict_objects.items():
+            if object_name in cp:
+                obj.load_state_dict(cp[object_name])
+
+    def _load(self, score_fn, apply: bool) -> dict:
+        files = (f.name for f in os.scandir(self.checkpoint_path) if f.is_file() and f.name.endswith(".pt"))
+        best_score = 0
+        best_score_file = None
+        for file in files:
+            score = score_fn(file)
+            if score >= best_score:
+                best_score = score
+                best_score_file = file
+
+        if best_score_file is None:
+            raise ValueError(f"No checkpoint found in '{self.checkpoint_path}'.")
+        cp = torch.load(os.path.join(self.checkpoint_path, best_score_file))
+
+        if apply:
+            self._apply_checkpoint(cp)
+        return cp
+
+    @staticmethod
+    def _get_epoch(file_name: str) -> int:
+        return int(file_name[file_name.index("_") + 1:file_name.rindex("_")])
+
+    @staticmethod
+    def _get_acc(file_name: str) -> float:
+        return float(file_name[file_name.rindex("_") + 1:-3])

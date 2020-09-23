@@ -1,5 +1,6 @@
 import argparse
 import os
+import yaml
 
 
 def get_configuration():
@@ -29,11 +30,15 @@ def get_configuration():
     parser.add_argument("--fixed_seed", default=None, type=int, help="Set a fixed seed for all random functions.")
     parser.add_argument("--session_type", type=str, default="training", choices=("training", "validation"),
                         help="Session type: Training or Evaluation.")
+    parser.add_argument("--session_id", type=str, help="If given, resume the session with the given id.")
     parser.add_argument("--in_path", type=str, required=True, help="Path to data sets for training/validation")
     parser.add_argument("--out_path", type=str, required=True,
                         help="Path where trained models temporary results / checkpoints will be stored")
 
     config = parser.parse_args()
+
+    if config.file is not None:
+        load_and_merge_configuration(config, config.file)
 
     if config.grad_accum_step is None:
         config.grad_accum_step = config.batch_size
@@ -67,8 +72,22 @@ def get_configuration():
     return config
 
 
-def save_configuration(config, out_path: str = None):
-    if out_path is None:
-        out_path = config.out_path
-    # TODO save config as yaml to outpath
-    pass
+def save_configuration(config: argparse.Namespace, out_path: str):
+    if not out_path.endswith(".yaml"):
+        out_path += ".yaml"
+
+    items = {k: v for k, v in config.__dict__.items() if v is not None}
+
+    with open(out_path, "w") as f:
+        yaml.dump(items, f, sort_keys=True)
+
+
+def load_and_merge_configuration(config: argparse.Namespace, in_path: str):
+    if not in_path.endswith(".yaml"):
+        in_path += ".yaml"
+
+    with open(in_path) as f:
+        file_config = yaml.load(f)
+
+    for key in file_config:
+        setattr(config, key, file_config[key])

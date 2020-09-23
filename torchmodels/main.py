@@ -1,6 +1,5 @@
 import os
 import time
-from typing import Tuple
 import locale
 
 locale.setlocale(locale.LC_ALL, "")
@@ -18,8 +17,8 @@ from util.graph import Graph
 from util.dynamic_import import import_model
 from datasets.ntu_rgb_d.constants import skeleton_edges, data_shape, num_classes
 
-from config import get_configuration
-from progress import ProgressLogger, wrap_color
+from config import get_configuration, load_and_merge_configuration, save_configuration
+from progress import ProgressLogger, CheckpointManager, wrap_color
 from metrics import MultiClassAccuracy, TopKAccuracy, MetricsContainer, SimpleMetric
 from data_input import NumpyDataset
 
@@ -44,18 +43,31 @@ class Session:
 
     def __init__(self, config):
         self._config = config
-        self._session_type = "profiling" if self._config.profiling else (self._config.session_type or "training")
-        id_fmt = f"{self._session_type}_%Y_%m_%d-%H_%M_%S_torch{torch.version.__version__}"
-        self._session_id = time.strftime(id_fmt)
-        if self._config.debug and not self._config.profiling:
-            self._session_id = "debug_" + self._session_id
-        self.log_path = os.path.join(self._config.out_path, "logs", self._session_id)
-        self.check_point_path = os.path.join(self._config.out_path, "checkpoints", self._session_id)
+        if self._config.session_id is not None:
+            self._session_id = self._config.session_id
+            self.is_resume = True
+        else:
+            self.is_resume = False
+            self._session_type = "profiling" if self._config.profiling else (self._config.session_type or "training")
+            id_fmt = f"{self._session_type}_%Y_%m_%d-%H_%M_%S_torch{torch.version.__version__}"
+            self._session_id = time.strftime(id_fmt)
+            if self._config.debug and not self._config.profiling:
+                self._session_id = "debug_" + self._session_id
+
+        self._log_path = os.path.join(self._config.out_path, self._session_id, "logs")
+        self._checkpoint_path = os.path.join(self._config.out_path, self._session_id, "checkpoints")
+        self._config_path = os.path.join(self._config.out_path, self._session_id, "config.yaml")
+
+        if self.is_resume:
+            load_and_merge_configuration(self._config, self._config_path)
+
         if self._config.batch_size == self._config.grad_accum_step:
             self._batch_fun = self._single_batch
         else:
             self._batch_fun = self._single_batch_accum
         if self._config.mixed_precision:
+            # https://pytorch.org/docs/stable/amp.html
+            # https://pytorch.org/docs/stable/notes/amp_examples.html#amp-examples
             self._forward = self._amp_forward
             self._loss_scale = GradScaler()
         else:
@@ -65,7 +77,8 @@ class Session:
         self._loss_function = None
         self._optimizer = None
         self._lr_scheduler = None
-        self._checkpoint = None  # TODO load checkpoint if given and set optimizer, lr_scheduler, etc.
+        self._starting_epoch = 0
+        self._checkpoint_manager = None
         self._data_loader = {}
         self._num_training_batches = None
         self._num_validation_batches = None
@@ -79,12 +92,29 @@ class Session:
         Model = import_model(self._config.model)
         self._model = Model(data_shape, num_classes, graph).cuda()
         self._loss_function = nn.CrossEntropyLoss().cuda()
-        # TODO set default optimizer, maybe load optimizer from checkpoint if given
         self._optimizer = torch.optim.SGD(self._model.parameters(), lr=self._config.base_lr, momentum=0.9,
                                           nesterov=self._config.nesterov,
                                           weight_decay=self._config.weight_decay)
         self._lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(self._optimizer, milestones=self._config.steps,
                                                                   gamma=0.1)
+
+        state_dict_objects = {
+            "model": self._model,
+            "optimizer": self._optimizer,
+            "loss_function": self._loss_function,
+        }
+
+        if self._lr_scheduler:
+            state_dict_objects["lr_scheduler"] = self._lr_scheduler
+
+        if self._loss_scale:
+            state_dict_objects["loss_scale"] = self._loss_scale
+
+        self._checkpoint_manager = CheckpointManager(self._checkpoint_path, state_dict_objects)
+
+        if self.is_resume:
+            cp = self._checkpoint_manager.load_latest()
+            self._starting_epoch = cp["epoch"] + 1
 
     def start(self):
         """
@@ -98,9 +128,9 @@ class Session:
             self._start_profiling()
         else:
             # Start either training or only validation (requires pretrained model)
-            os.makedirs(self.log_path, exist_ok=True)
+            os.makedirs(self._log_path, exist_ok=True)
             self._build_metrics()
-            # TODO Copy model file and configuration
+            save_configuration(self._config, self._config_path)
             self._progress.begin_session(self._session_type)
             if self._session_type == "training":
                 self._start_training()
@@ -130,18 +160,18 @@ class Session:
         if self._session_type == "training":
             print(f"Training batches: {self._num_training_batches:n}")
         print(f"Evaluation batches: {self._num_validation_batches:n}")
-        print("Logs will be written to:", self.log_path)
-        print("Model checkpoints will be written to:", self.check_point_path)
+        print("Logs will be written to:", self._log_path)
+        print("Model checkpoints will be written to:", self._checkpoint_path)
 
     def _build_metrics(self):
         """
         Create the logger and metrics container to measure performance,
         accumulate metrics and print them to console and tensorboard.
         """
-        self._progress = ProgressLogger(self.log_path, self._config.epochs, modes=[
+        self._progress = ProgressLogger(self._log_path, self._config.epochs, modes=[
             ("training", self._num_training_batches),
             ("validation", self._num_validation_batches)
-        ], tensorboard=not self._config.debug)
+        ])
         self._metrics = MetricsContainer([
             MultiClassAccuracy("training_accuracy"),
             MultiClassAccuracy("validation_accuracy"),
@@ -171,10 +201,6 @@ class Session:
             self._config.test_batch_size, shuffle=False, drop_last=False,
             worker_init_fn=set_seed if self._config.fixed_seed is not None else None)
         self._num_validation_batches = len(self._data_loader["val"])
-
-    def _save_checkpoint(self):
-        os.makedirs(self.check_point_path, exist_ok=True)
-        # TODO implement
 
     def _start_profiling(self):
         """
@@ -297,8 +323,6 @@ class Session:
         # https://discuss.pytorch.org/t/proper-way-of-fixing-batchnorm-layers-during-training/13214/3
         # https://medium.com/analytics-vidhya/effect-of-batch-size-on-training-process-and-results-by-gradient-accumulation-e7252ee2cb3f
         # https://towardsdatascience.com/what-is-gradient-accumulation-in-deep-learning-ec034122cfa?gi=ac2bf65a793c
-        # TODO implement amp mixed precision https://pytorch.org/docs/stable/amp.html
-        # https://pytorch.org/docs/stable/notes/amp_examples.html#amp-examples
 
         for epoch in range(self._config.epochs):
             # Begin epoch
@@ -316,9 +340,13 @@ class Session:
             # Finalize epoch
             self._progress.end_epoch(self._metrics)
             self._lr_scheduler.step()
+            self._checkpoint_manager.save_checkpoint(epoch, self._metrics["validation_accuracy"].value)
             self._metrics.reset_all()
 
+        self._checkpoint_manager.save_weights(self._model, self._session_id)
+
     def _start_validation(self):
+        # TODO implement validation only
         pass
 
 

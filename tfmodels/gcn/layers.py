@@ -29,12 +29,10 @@ class GraphConvolution(keras.layers.Layer):
     def call(self, inputs, **kwargs):
         x = inputs
         if self.dropout_rate is not None and self.dropout_rate > 0.:
-            # TODO sparse version
             x = keras.layers.Dropout(self.dropout_rate)(x)
 
         summands = []
         for kernel, support in zip(self.kernel, self.support):
-            # TODO sparse version
             # print("Input:", x.shape, x.dtype)
             # print("Kernel:", tf.expand_dims(kernel, 0).shape, tf.expand_dims(kernel, 0).dtype)
             res = tf.linalg.matmul(x, kernel)

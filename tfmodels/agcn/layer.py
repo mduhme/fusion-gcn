@@ -47,7 +47,6 @@ class SpatialGraphConvolution(keras.layers.Layer):
             self.w.append(keras.layers.Conv2D(num_filters, 1, padding="same", data_format="channels_first",
                                               kernel_initializer=branch_conv_init,
                                               kernel_regularizer=config.kernel_regularizer))
-        # TODO only w uses 'branch_conv_init'
 
         self.bn = keras.layers.BatchNormalization(axis=1, epsilon=1e-5)
         self.down = down
@@ -65,7 +64,7 @@ class SpatialGraphConvolution(keras.layers.Layer):
     def _sum_iteration(self, x, k):
         batch_size, num_channels, num_frames, num_joints = tf.unstack(tf.shape(x))
         c1 = tf.reshape(tf.transpose(self.w_theta[k](x), perm=(0, 3, 1, 2)),
-                        (batch_size, num_joints, -1))  # TODO switch reshape and transpose
+                        (batch_size, num_joints, -1))
         c2 = tf.reshape(self.w_phi[k](x), (batch_size, -1, num_joints))
         c = tf.matmul(c1, c2) / tf.cast(tf.shape(c1)[-1], tf.float32)
         c = tf.nn.softmax(c, axis=-2)
@@ -86,7 +85,7 @@ class SpatialGraphConvolution(keras.layers.Layer):
 class TemporalGraphConvolution(keras.layers.Layer):
     def __init__(self, config, num_filters, kernel_size, stride, activation="relu", **kwargs):
         super().__init__(**kwargs)
-        self.activation = keras.activations.get(activation)  # TODO use this? It is unused in original paper
+        self.activation = keras.activations.get(activation)  # use this? It is unused in original paper
         # Input shape is (batch_size*num_bodies, num_channels, num_frames, num_joints)
         self.layers = [
             # batch normalize over channels
@@ -112,7 +111,6 @@ class GraphConvolution(keras.layers.Layer):
                                                        **kwargs)
         self.residual_layers = []
 
-        # TODO parameter 'downsampling' unnecessary
         if not residual:
             self.residual = lambda x, training=None: 0
         elif down and temporal_stride == 1:
@@ -158,7 +156,6 @@ class GraphConvolutionSequenceLayer(keras.layers.Layer):
         # Merge batch_size and num_bodies: Output shape = (batch_size*num_bodies, num_channels, num_frames, num_joints)
         # Required for using the Conv2D layers that expect
         # (batch_size, num_channels, W, H) with data_format="channels_first"
-        # TODO Don't like modifying the batch_size, maybe it should be merged with another property (num_joints?)
         x = tf.reshape(inputs, tf.concat([tf.reduce_prod(tf.shape(inputs)[:2], keepdims=True), tf.shape(inputs)[2:]],
                                          axis=0))
 

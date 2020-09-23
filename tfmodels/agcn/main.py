@@ -134,7 +134,7 @@ class ModelTraining:
         if not os.path.exists(self.check_point_path):
             os.makedirs(self.check_point_path)
 
-        # TODO store config in log dir for reproduction
+        # TODO store config in log dir for reproducibility
 
         self.optimizer = optimizer
         if optimizer is None:
@@ -233,7 +233,6 @@ class ModelTraining:
         num_batches = self.num_training_samples // self.config.batch_size if self.num_training_samples else None
         val_batches = self.num_validation_samples // self.config.batch_size if self.num_validation_samples else None
 
-        # TODO add timer to print after each epoch
         # TODO maybe try different types of learning rate scheduling (1cycle, ...)
         for epoch in range(self.config.epochs):
             print(f"Epoch {epoch + 1}:")
@@ -247,7 +246,6 @@ class ModelTraining:
 
                 if epoch == 0 and self.config.profiling:
                     if step == self.config.profiling_range[0]:
-                        # tf.profiler.warmup()  TODO keras 2.3
                         tf.profiler.experimental.start(self.log_path)
                     elif step == self.config.profiling_range[1]:
                         tf.profiler.experimental.stop()

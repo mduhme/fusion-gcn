@@ -137,6 +137,7 @@ class MetricsContainer:
         self._validation_format_metrics = [self.validation_loss] + self._validation_metrics
         self._metrics_dict = {m.name: m for m in self._metrics}
         self._related_metrics = related_metrics or {}
+        self._history = {}
 
     def __getitem__(self, item):
         """
@@ -145,6 +146,12 @@ class MetricsContainer:
         :return: metric associated to name
         """
         return self._metrics_dict[item]
+
+    def get_value_history(self) -> Dict[str, List[float]]:
+        """
+        :return: History of values for each metric at each epoch
+        """
+        return self._history
 
     def get_metrics(self) -> List[Metric]:
         """
@@ -159,10 +166,27 @@ class MetricsContainer:
         """
         return self._related_metrics
 
-    def reset_all(self):
+    def _save_metrics(self):
+        """
+        Save current value for each metric in history.
+        :return:
+        """
+        for k, v in self._metrics_dict.items():
+            if k in self._history:
+                self._history[k].append(v.value)
+            else:
+                self._history[k] = [v.value]
+        # assert history has equal length for each metric
+        assert (len(next(iter(self._history.values()))) * len(self._history)) == sum(
+            len(v) for v in self._history.values()), "Inconsistency in history length when creating metric history"
+
+    def reset_all(self, save_history: bool = True):
         """
         Reset all metrics to 0 / None values.
         """
+        if save_history:
+            self._save_metrics()
+
         for m in self._metrics:
             m.reset()
 

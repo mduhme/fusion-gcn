@@ -48,6 +48,9 @@ def launch_tensorboard(log_path: str) -> str:
 
 
 class StopWatch:
+    """
+    Measure duration of any operation.
+    """
     def __init__(self):
         self.start_time = None
         self.end_time = None
@@ -72,9 +75,8 @@ class StopWatch:
             elapsed = self.get_elapsed()
         else:
             elapsed = self.total_duration
-        elapsed = int(round(elapsed))
         seconds_per_step = elapsed / steps
-        return elapsed, seconds_per_step
+        return int(round(elapsed)), seconds_per_step
 
     @property
     def total_duration(self) -> float:

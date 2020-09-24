@@ -32,8 +32,8 @@ def set_seed(seed: int):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     random.seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    # torch.backends.cudnn.deterministic = True
+    # torch.backends.cudnn.benchmark = False
 
 
 class Session:
@@ -172,6 +172,9 @@ class Session:
             ("training", self._num_training_batches),
             ("validation", self._num_validation_batches)
         ])
+        # TODO add multi-class precision and recall
+        # https://medium.com/data-science-in-your-pocket/calculating-precision-recall-for-multi-class-classification-9055931ee229
+        # https://towardsdatascience.com/multi-class-metrics-made-simple-part-i-precision-and-recall-9250280bddc2?gi=a28f7efba99e
         self._metrics = MetricsContainer([
             MultiClassAccuracy("training_accuracy"),
             MultiClassAccuracy("validation_accuracy"),
@@ -347,6 +350,7 @@ class Session:
 
     def _start_validation(self):
         # TODO implement validation only
+        torch.nn.functional.gumbel_softmax()
         pass
 
 

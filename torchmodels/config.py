@@ -10,8 +10,11 @@ def get_configuration():
                              " over command line parameters if specified.")
     parser.add_argument("-m", "--model", default="agcn", type=str, choices=("agcn", "msg3d"),
                         help="Model to train or evaluate.")
+    parser.add_argument("-d", "--dataset", default="utd_mhad", type=str, choices=("ntu_rgb_d", "utd_mhad"),
+                        help="Specify which dataset constants to load from the 'datasets' subdirectory.")
     parser.add_argument("--base_lr", default=0.1, type=float, help="Initial learning rate")
-    parser.add_argument("--batch_size", default=10, type=int, help="Batch size")
+    parser.add_argument("--batch_size", default=8, type=int,
+                        help="Batch size (Should be multiple of 8 if using mixed precision)")
     parser.add_argument("--grad_accum_step", default=None, type=int,
                         help="Step size for gradient accumulation. Same as batch_size if unspecified.")
     parser.add_argument("--test_batch_size", default=None, type=int,
@@ -31,14 +34,18 @@ def get_configuration():
     parser.add_argument("--session_type", type=str, default="training", choices=("training", "validation"),
                         help="Session type: Training or Evaluation.")
     parser.add_argument("--session_id", type=str, help="If given, resume the session with the given id.")
-    parser.add_argument("--in_path", type=str, required=True, help="Path to data sets for training/validation")
-    parser.add_argument("--out_path", type=str, required=True,
+    parser.add_argument("--in_path", type=str, help="Path to data sets for training/validation")
+    parser.add_argument("--out_path", type=str,
                         help="Path where trained models temporary results / checkpoints will be stored")
 
     config = parser.parse_args()
 
     if config.file is not None:
         load_and_merge_configuration(config, config.file)
+
+    required_args = ["in_path", "out_path"]
+    if not all(hasattr(config, attr) for attr in required_args):
+        raise LookupError("The following arguments are required: " + ", ".join(required_args))
 
     if config.grad_accum_step is None:
         config.grad_accum_step = config.batch_size
@@ -50,7 +57,6 @@ def get_configuration():
 
     assert config.batch_size % config.grad_accum_step == 0, \
         "Gradient accumulation step size must be a factor of batch size"
-    setattr(config, "gradient_accumulation_steps", config.batch_size // config.grad_accum_step)
 
     if not os.path.exists(config.in_path):
         print("Input path does not exist:", config.in_path)
@@ -60,10 +66,14 @@ def get_configuration():
     config.out_path = os.path.abspath(config.out_path)
 
     # Add path to training/validation sets to config
-    setattr(config, "training_features_path", os.path.join(config.in_path, "train_features.npy"))
-    setattr(config, "training_labels_path", os.path.join(config.in_path, "train_labels.npy"))
-    setattr(config, "validation_features_path", os.path.join(config.in_path, "val_features.npy"))
-    setattr(config, "validation_labels_path", os.path.join(config.in_path, "val_labels.npy"))
+    if not hasattr(config, "training_features_path"):
+        setattr(config, "training_features_path", os.path.join(config.in_path, "train_features.npy"))
+    if not hasattr(config, "training_labels_path"):
+        setattr(config, "training_labels_path", os.path.join(config.in_path, "train_labels.npy"))
+    if not hasattr(config, "validation_features_path"):
+        setattr(config, "validation_features_path", os.path.join(config.in_path, "val_features.npy"))
+    if not hasattr(config, "validation_labels_path"):
+        setattr(config, "validation_labels_path", os.path.join(config.in_path, "val_labels.npy"))
 
     # Create output path if it does not exist
     if not os.path.exists(config.out_path):
@@ -87,7 +97,7 @@ def load_and_merge_configuration(config: argparse.Namespace, in_path: str):
         in_path += ".yaml"
 
     with open(in_path) as f:
-        file_config = yaml.load(f)
+        file_config = yaml.load(f, Loader=yaml.FullLoader)
 
     for key in file_config:
         setattr(config, key, file_config[key])

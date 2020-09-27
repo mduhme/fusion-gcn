@@ -8,14 +8,13 @@ import random
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.backends.cudnn as cudnn
 from torch.utils.data import DataLoader
 from torch.autograd.profiler import profile
 from torch.cuda.amp import autocast, GradScaler
 
 from util.graph import Graph
-from util.dynamic_import import import_model
-from datasets.ntu_rgb_d.constants import skeleton_edges, data_shape, num_classes
+from util.dynamic_import import import_model, import_dataset_constants
+# from datasets.ntu_rgb_d.constants import skeleton_edges, data_shape, num_classes
 
 from config import get_configuration, load_and_merge_configuration, save_configuration
 from progress import ProgressLogger, CheckpointManager, wrap_color
@@ -32,6 +31,7 @@ def set_seed(seed: int):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     random.seed(seed)
+    # import torch.backends.cudnn as cudnn
     # torch.backends.cudnn.deterministic = True
     # torch.backends.cudnn.benchmark = False
 
@@ -63,8 +63,10 @@ class Session:
 
         if self._config.batch_size == self._config.grad_accum_step:
             self._batch_fun = self._single_batch
+            self._gradient_accumulation_steps = 0
         else:
             self._batch_fun = self._single_batch_accum
+            self._gradient_accumulation_steps = self._config.batch_size // self._config.grad_accum_step
         if self._config.mixed_precision:
             # https://pytorch.org/docs/stable/amp.html
             # https://pytorch.org/docs/stable/notes/amp_examples.html#amp-examples
@@ -74,6 +76,7 @@ class Session:
             self._forward = self._default_forward
             self._loss_scale = None
         self._model = None
+        self._dataset_constants = {}
         self._loss_function = None
         self._optimizer = None
         self._lr_scheduler = None
@@ -86,6 +89,10 @@ class Session:
         self._progress = None
 
     def _initialize_model(self):
+        skeleton_edges, data_shape, num_classes = import_dataset_constants(self._config.dataset, [
+            "skeleton_edges", "data_shape", "num_classes"
+        ])
+
         graph = Graph(skeleton_edges)
         # https://pytorch.org/docs/stable/generated/torch.nn.Module.html
         # noinspection PyPep8Naming
@@ -152,6 +159,7 @@ class Session:
         if self._config.fixed_seed is not None:
             print("Fixed seed:", self._config.fixed_seed)
         print("Model:", self._config.model.upper())
+        print("Dataset:", self._config.dataset.replace("_", "-").upper())
         print(f"Model - Trainable parameters: {num_trainable_params:n} | Total parameters: {num_total_params:n}")
         print("Batch size:", self._config.batch_size)
         print("Gradient accumulation step size:", self._config.grad_accum_step)
@@ -209,6 +217,8 @@ class Session:
         """
         Start profiling: https://pytorch.org/tutorials/recipes/recipes/profiler.html
         """
+        data_shape, num_classes = import_dataset_constants(self._config.dataset, ["data_shape", "num_classes"])
+
         print(wrap_color("Start profiling...", 31), end="")
         num_batches = self._config.profiling_batches
         features_shape = (num_batches, self._config.grad_accum_step, *data_shape)
@@ -228,14 +238,14 @@ class Session:
         print(wrap_color("\rStart profiling... Done.", 31))
         print(wrap_color(prof.key_averages().table(sort_by="cuda_time_total"), 31))
 
-    def _default_forward(self, features: torch.Tensor, label: torch.Tensor, loss_scale: int = 1):
+    def _default_forward(self, features: torch.Tensor, label: torch.Tensor, loss_quotient: int = 1):
         y_pred = self._model(features)
-        loss = self._loss_function(y_pred, label) / loss_scale
+        loss = self._loss_function(y_pred, label) / loss_quotient
         return y_pred, loss
 
-    def _amp_forward(self, features: torch.Tensor, label: torch.Tensor, loss_scale: int = 1):
+    def _amp_forward(self, features: torch.Tensor, label: torch.Tensor, loss_quotient: int = 1):
         with autocast():
-            return self._default_forward(features, label, loss_scale)
+            return self._default_forward(features, label, loss_quotient)
 
     def _backward(self, loss: torch.Tensor):
         if self._config.mixed_precision:
@@ -267,7 +277,7 @@ class Session:
         :param features: features tensor of len batch_size
         :param label: label tensor of len batch_size
         """
-        for step in range(self._config.gradient_accumulation_steps):
+        for step in range(self._gradient_accumulation_steps):
             start = step * self._config.grad_accum_step
             end = start + self._config.grad_accum_step
             x, y_true = features[start:end], label[start:end]
@@ -350,7 +360,6 @@ class Session:
 
     def _start_validation(self):
         # TODO implement validation only
-        torch.nn.functional.gumbel_softmax()
         pass
 
 

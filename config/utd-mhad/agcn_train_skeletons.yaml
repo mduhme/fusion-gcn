@@ -1,0 +1,14 @@
+in_path: ..\preprocessed_data\UTD-MHAD
+out_path: ..\models\agcn\UTD-MHAD
+model: agcn
+session_type: training
+dataset: utd_mhad
+
+batch_size: 24
+base_lr: 0.01
+nesterov: true
+epochs: 50
+steps:
+- 40
+- 45
+weight_decay: 0.0001

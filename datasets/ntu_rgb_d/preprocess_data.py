@@ -5,8 +5,10 @@ import numpy as np
 from typing import List
 from tqdm import tqdm
 
+from util.preprocessing.skeleton import validate_skeleton_data, normalize_skeleton_data
+
 from datasets.ntu_rgb_d.constants import *
-from datasets.ntu_rgb_d.skeleton import *
+from datasets.ntu_rgb_d.skeleton import SkeletonMetaData, SkeletonSample
 
 
 def is_sample(skeleton: SkeletonMetaData, benchmark: str, subset: str):
@@ -63,7 +65,7 @@ def process_skeletons(skeletons: List[SkeletonMetaData], processed_data_path: st
 
             print("Normalizing skeleton data...")
             validate_skeleton_data(skeleton_data)
-            normalize_skeleton_data(skeleton_data)
+            normalize_skeleton_data(skeleton_data, 1, (0, 1), (4, 8))
             skeleton_data = skeleton_data.transpose((0, 4, 2, 3, 1))
             np.save(os.path.join(out_path, f"{subset}_features.npy"), skeleton_data)
 

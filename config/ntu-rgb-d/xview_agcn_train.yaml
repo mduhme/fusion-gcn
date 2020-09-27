@@ -1,0 +1,17 @@
+
+fixed_seed: 1
+
+in_path: ..\preprocessed_data\NTU-RGB-D\xview
+out_path: ..\models\agcn\NTU-RGB-D\xview
+model: agcn
+session_type: training
+dataset: ntu_rgb_d
+
+batch_size: 10
+base_lr: 0.1
+nesterov: true
+epochs: 50
+steps:
+- 30
+- 40
+weight_decay: 0.0001

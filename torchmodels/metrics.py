@@ -169,7 +169,6 @@ class MetricsContainer:
     def _save_metrics(self):
         """
         Save current value for each metric in history.
-        :return:
         """
         for k, v in self._metrics_dict.items():
             if k in self._history:

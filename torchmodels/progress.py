@@ -206,7 +206,7 @@ class CheckpointManager:
         state_dicts = {k: v.state_dict() for k, v in self.state_dict_objects.items()}
         state_dicts = {**state_dicts, **additional_objects, "epoch": epoch}
 
-        out_file = os.path.join(self.checkpoint_path, f"checkpoint_{epoch}_{val_acc:.2}.pt")
+        out_file = os.path.join(self.checkpoint_path, f"checkpoint_{epoch}_{val_acc:.4}.pt")
         torch.save(state_dicts, out_file)
 
     def save_weights(self, model: torch.nn.Module, file_name_prefix: str = ""):

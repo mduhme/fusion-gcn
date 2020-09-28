@@ -8,7 +8,7 @@ from tqdm import tqdm
 from util.preprocessing.skeleton import validate_skeleton_data, normalize_skeleton_data
 
 from datasets.ntu_rgb_d.constants import *
-from datasets.ntu_rgb_d.skeleton import SkeletonMetaData, SkeletonSample
+from datasets.ntu_rgb_d.io import SkeletonMetaData, SkeletonSample
 
 
 def is_sample(skeleton: SkeletonMetaData, benchmark: str, subset: str):

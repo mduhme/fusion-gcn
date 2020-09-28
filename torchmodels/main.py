@@ -11,6 +11,8 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.autograd.profiler import profile
 from torch.cuda.amp import autocast, GradScaler
+import ray
+from ray import tune
 
 from util.graph import Graph
 from util.dynamic_import import import_model, import_dataset_constants
@@ -20,6 +22,7 @@ from config import get_configuration, load_and_merge_configuration, save_configu
 from progress import ProgressLogger, CheckpointManager, wrap_color
 from metrics import MultiClassAccuracy, TopKAccuracy, MetricsContainer, SimpleMetric
 from data_input import NumpyDataset
+import training_helper
 
 
 def set_seed(seed: int):
@@ -54,12 +57,12 @@ class Session:
             if self._config.debug and not self._config.profiling:
                 self._session_id = "debug_" + self._session_id
 
-        self._log_path = os.path.join(self._config.out_path, self._session_id, "logs")
-        self._checkpoint_path = os.path.join(self._config.out_path, self._session_id, "checkpoints")
-        self._config_path = os.path.join(self._config.out_path, self._session_id, "config.yaml")
+        self.log_path = os.path.join(self._config.out_path, self._session_id, "logs")
+        self.checkpoint_path = os.path.join(self._config.out_path, self._session_id, "checkpoints")
+        self.config_path = os.path.join(self._config.out_path, self._session_id, "config.yaml")
 
         if self.is_resume:
-            load_and_merge_configuration(self._config, self._config_path)
+            load_and_merge_configuration(self._config, self.config_path)
 
         if self._config.batch_size == self._config.grad_accum_step:
             self._batch_fun = self._single_batch
@@ -87,8 +90,11 @@ class Session:
         self._num_validation_batches = None
         self._metrics = None
         self._progress = None
+        self._reporter = None
 
-    def _initialize_model(self):
+    def _initialize_model(self, model_config):
+        # TODO implement tuning: https://docs.ray.io/en/latest/tune/index.html
+        # https://stackoverflow.com/questions/44260217/hyperparameter-optimization-for-pytorch-model
         skeleton_edges, data_shape, num_classes = import_dataset_constants(self._config.dataset, [
             "skeleton_edges", "data_shape", "num_classes"
         ])
@@ -99,11 +105,15 @@ class Session:
         Model = import_model(self._config.model)
         self._model = Model(data_shape, num_classes, graph).cuda()
         self._loss_function = nn.CrossEntropyLoss().cuda()
-        self._optimizer = torch.optim.SGD(self._model.parameters(), lr=self._config.base_lr, momentum=0.9,
-                                          nesterov=self._config.nesterov,
-                                          weight_decay=self._config.weight_decay)
-        self._lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(self._optimizer, milestones=self._config.steps,
-                                                                  gamma=0.1)
+        self._optimizer = training_helper.get_optimizer(model_config["optimizer"], self._model, model_config["base_lr"],
+                                                        **model_config["optimizer_args"])
+
+        if self._config.lr_scheduler == "onecycle":
+            model_config["epochs"] = self._config.epochs
+            model_config["steps_per_epoch"] = self._num_training_batches
+
+        self._lr_scheduler = training_helper.get_learning_rate_scheduler(model_config["lr_scheduler"], self._optimizer,
+                                                                         **model_config["lr_scheduler_args"])
 
         state_dict_objects = {
             "model": self._model,
@@ -117,27 +127,36 @@ class Session:
         if self._loss_scale:
             state_dict_objects["loss_scale"] = self._loss_scale
 
-        self._checkpoint_manager = CheckpointManager(self._checkpoint_path, state_dict_objects)
+        self._checkpoint_manager = CheckpointManager(self.checkpoint_path, state_dict_objects)
 
         if self.is_resume:
             cp = self._checkpoint_manager.load_latest()
             self._starting_epoch = cp["epoch"] + 1
 
-    def start(self):
+    def start(self, config=None, reporter=None):
         """
         Start training or validation based on session type.
         """
-        self._initialize_model()
+        if config is None:
+            config = training_helper.get_model_config(self._config)
+        self._initialize_model(config)
         self._load_data()
-        self.print_summary()
+        if self._config.tuning:
+            print("Config:", config)
+        else:
+            self.print_summary(config)
+        self._reporter = reporter
 
         if self._config.profiling:
             self._start_profiling()
         else:
+            os.makedirs(self.log_path, exist_ok=True)
             # Start either training or only validation (requires pretrained model)
-            os.makedirs(self._log_path, exist_ok=True)
-            self._build_metrics()
-            save_configuration(self._config, self._config_path)
+            log_file = None
+            if self._config.tuning:
+                log_file = open(os.path.join(self.log_path, "progress.log"), "w")
+            self._build_metrics(log_file)
+            save_configuration(self._config, self.config_path)
             self._progress.begin_session(self._session_type)
             if self._session_type == "training":
                 self._start_training()
@@ -146,8 +165,10 @@ class Session:
             else:
                 raise ValueError("Unknown session type " + str(self._session_type))
             self._progress.end_session()
+            if log_file:
+                log_file.close()
 
-    def print_summary(self):
+    def print_summary(self, config):
         """
         Print session and model related information before training/evaluation starts.
         """
@@ -168,18 +189,19 @@ class Session:
         if self._session_type == "training":
             print(f"Training batches: {self._num_training_batches:n}")
         print(f"Evaluation batches: {self._num_validation_batches:n}")
-        print("Logs will be written to:", self._log_path)
-        print("Model checkpoints will be written to:", self._checkpoint_path)
+        print("Logs will be written to:", self.log_path)
+        print("Model checkpoints will be written to:", self.checkpoint_path)
+        print("Config:", config)
 
-    def _build_metrics(self):
+    def _build_metrics(self, log_file=None):
         """
         Create the logger and metrics container to measure performance,
         accumulate metrics and print them to console and tensorboard.
         """
-        self._progress = ProgressLogger(self._log_path, self._config.epochs, modes=[
+        self._progress = ProgressLogger(self.log_path, self._config.epochs, modes=[
             ("training", self._num_training_batches),
             ("validation", self._num_validation_batches)
-        ])
+        ], file=log_file)
         # TODO add multi-class precision and recall
         # https://medium.com/data-science-in-your-pocket/calculating-precision-recall-for-multi-class-classification-9055931ee229
         # https://towardsdatascience.com/multi-class-metrics-made-simple-part-i-precision-and-recall-9250280bddc2?gi=a28f7efba99e
@@ -352,8 +374,14 @@ class Session:
 
             # Finalize epoch
             self._progress.end_epoch(self._metrics)
-            self._lr_scheduler.step()
-            self._checkpoint_manager.save_checkpoint(epoch, self._metrics["validation_accuracy"].value)
+            val_loss = self._metrics["validation_loss"].value
+            val_acc = self._metrics["validation_accuracy"].value
+            if self._lr_scheduler:
+                self._lr_scheduler.step()
+            if self._reporter:
+                self._reporter(mean_loss=val_loss, mean_accuracy=val_acc, epoch=epoch)
+            else:
+                self._checkpoint_manager.save_checkpoint(epoch, val_acc)
             self._metrics.reset_all()
 
         self._checkpoint_manager.save_weights(self._model, self._session_id)
@@ -369,4 +397,12 @@ if __name__ == "__main__":
         set_seed(cf.fixed_seed)
 
     session = Session(cf)
-    session.start()
+    if cf.tuning:
+        ray.init(include_dashboard=False, local_mode=True, num_gpus=1, num_cpus=1)
+        analysis = tune.run(session.start, "Tuning session", config=training_helper.get_tune_config())
+        result = analysis.get_best_trial("mean_accuracy")
+        print("Best trial config: {}".format(result.config))
+        print("Best trial final validation loss: {}".format(result.last_result["mean_loss"]))
+        print("Best trial final validation accuracy: {}".format(result.last_result["mean_accuracy"]))
+    else:
+        session.start()

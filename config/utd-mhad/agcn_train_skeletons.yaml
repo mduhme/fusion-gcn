@@ -4,11 +4,19 @@ model: agcn
 session_type: training
 dataset: utd_mhad
 
-batch_size: 24
 base_lr: 0.01
-nesterov: true
+optimizer: SGD
+optimizer_args:
+  momentum: 0.9
+  nesterov: true
+  weight_decay: 0.0001
+
+lr_scheduler: multistep
+lr_scheduler_args:
+  milestones:
+    - 40
+    - 45
+  gamma: 0.1
+
+batch_size: 24
 epochs: 50
-steps:
-- 40
-- 45
-weight_decay: 0.0001

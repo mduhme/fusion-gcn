@@ -108,9 +108,9 @@ class Session:
         self._optimizer = training_helper.get_optimizer(model_config["optimizer"], self._model, model_config["base_lr"],
                                                         **model_config["optimizer_args"])
 
-        if self._config.lr_scheduler == "onecycle":
-            model_config["epochs"] = self._config.epochs
-            model_config["steps_per_epoch"] = self._num_training_batches
+        if model_config["lr_scheduler"] == "onecycle":
+            model_config["lr_scheduler_args"]["epochs"] = self._config.epochs
+            model_config["lr_scheduler_args"]["steps_per_epoch"] = self._num_training_batches
 
         self._lr_scheduler = training_helper.get_learning_rate_scheduler(model_config["lr_scheduler"], self._optimizer,
                                                                          **model_config["lr_scheduler_args"])
@@ -139,8 +139,14 @@ class Session:
         """
         if config is None:
             config = training_helper.get_model_config(self._config)
-        self._initialize_model(config)
+        else:
+            if "batch_size" in config:
+                self._config.batch_size = config["batch_size"]
+            config = training_helper.fill_default_optimizer_args(config)
+            config = training_helper.fill_default_learning_rate_scheduler_args(config)
+            config = training_helper.parse_config(config)
         self._load_data()
+        self._initialize_model(config)
         if self._config.tuning:
             print("Config:", config)
         else:

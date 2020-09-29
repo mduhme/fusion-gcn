@@ -21,23 +21,9 @@ from util.dynamic_import import import_model, import_dataset_constants
 from config import get_configuration, load_and_merge_configuration, save_configuration
 from progress import ProgressLogger, CheckpointManager, wrap_color
 from metrics import MultiClassAccuracy, TopKAccuracy, MetricsContainer, SimpleMetric
-from data_input import NumpyDataset
+from data_input import SkeletonDataset
 import training_helper
-
-
-def set_seed(seed: int):
-    """
-    Set seed for reproducibility.
-    :param seed: seed
-    """
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    random.seed(seed)
-    # import torch.backends.cudnn as cudnn
-    # torch.backends.cudnn.deterministic = True
-    # torch.backends.cudnn.benchmark = False
-
+import torch_util
 
 class Session:
     """
@@ -224,15 +210,15 @@ class Session:
         if self._session_type == "training":
             shuffle = not (self._config.no_shuffle or self._config.debug)
             self._data_loader["train"] = DataLoader(
-                NumpyDataset(self._config.training_features_path, self._config.training_labels_path,
-                             self._config.debug), self._config.batch_size, shuffle=shuffle,
-                drop_last=True, worker_init_fn=set_seed if self._config.fixed_seed is not None else None)
+                SkeletonDataset(self._config.training_features_path, self._config.training_labels_path,
+                                self._config.debug), self._config.batch_size, shuffle=shuffle,
+                drop_last=True, worker_init_fn=torch_util.set_seed if self._config.fixed_seed is not None else None)
             self._num_training_batches = len(self._data_loader["train"])
 
         self._data_loader["val"] = DataLoader(
-            NumpyDataset(self._config.validation_features_path, self._config.validation_labels_path),
+            SkeletonDataset(self._config.validation_features_path, self._config.validation_labels_path),
             self._config.test_batch_size, shuffle=False, drop_last=False,
-            worker_init_fn=set_seed if self._config.fixed_seed is not None else None)
+            worker_init_fn=torch_util.set_seed if self._config.fixed_seed is not None else None)
         self._num_validation_batches = len(self._data_loader["val"])
 
     def _start_profiling(self):
@@ -394,12 +380,12 @@ class Session:
 if __name__ == "__main__":
     cf = get_configuration()
     if cf.fixed_seed is not None:
-        set_seed(cf.fixed_seed)
+        torch_util.set_seed(cf.fixed_seed)
 
     session = Session(cf)
     if cf.tuning:
         ray.init(include_dashboard=False, local_mode=True, num_gpus=1, num_cpus=1)
-        analysis = tune.run(session.start, "Tuning session", config=training_helper.get_tune_config())
+        analysis = tune.run(session.start, "Session", config=training_helper.get_tune_config())
         result = analysis.get_best_trial("mean_accuracy")
         print("Best trial config: {}".format(result.config))
         print("Best trial final validation loss: {}".format(result.last_result["mean_loss"]))

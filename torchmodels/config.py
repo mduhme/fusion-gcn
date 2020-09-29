@@ -17,6 +17,9 @@ def get_configuration():
                         help="Model to train or evaluate.")
     parser.add_argument("-d", "--dataset", default="utd_mhad", type=str, choices=("ntu_rgb_d", "utd_mhad"),
                         help="Specify which dataset constants to load from the 'datasets' subdirectory.")
+    parser.add_argument("--in_path", type=str, help="Path to data sets for training/validation")
+    parser.add_argument("--out_path", type=str,
+                        help="Path where trained models temporary results / checkpoints will be stored")
     parser.add_argument("--base_lr", default=0.1, type=float, help="Initial learning rate")
     parser.add_argument("--batch_size", default=8, type=int,
                         help="Batch size (Should be multiple of 8 if using mixed precision)")
@@ -35,13 +38,11 @@ def get_configuration():
     parser.add_argument("--debug", action="store_true", help="Smaller dataset and includes '--fixed_seed'.")
     parser.add_argument("--tuning", action="store_true",
                         help="Activates hyper parameter tuning. Runs the training multiple times.")
+    parser.add_argument("--disable_logging", action="store_true", help="Disable printing status to console.")
     parser.add_argument("--fixed_seed", default=None, type=int, help="Set a fixed seed for all random functions.")
     parser.add_argument("--session_type", type=str, default="training", choices=("training", "validation"),
                         help="Session type: Training or Evaluation.")
     parser.add_argument("--session_id", type=str, help="If given, resume the session with the given id.")
-    parser.add_argument("--in_path", type=str, help="Path to data sets for training/validation")
-    parser.add_argument("--out_path", type=str,
-                        help="Path where trained models temporary results / checkpoints will be stored")
 
     config = parser.parse_args()
 

@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from msg3d.activation import activation_factory
+from models.msg3d.activation import activation_factory
 
 
 class MLP(nn.Module):

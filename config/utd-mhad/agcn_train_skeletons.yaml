@@ -1,24 +1,22 @@
 in_path: ..\preprocessed_data\UTD-MHAD
 out_path: ..\models\agcn\UTD-MHAD
 model: agcn
-dataset: utd_mhad
+dataset: UTD-MHAD
+session_type: training
 
 base_lr: 0.005
-optimizer: ADAM
-# optimizer_args:
-#   momentum: 0.9
-#   nesterov: true
-#   weight_decay: 0.01
+optimizer: SGD
+optimizer_args:
+  momentum: 0.9
+  nesterov: true
+  weight_decay: 0.01
 
-lr_scheduler: onecycle
+lr_scheduler: multistep
 lr_scheduler_args:
-  max_lr: 0.01
-# lr_scheduler_args:
-#   milestones:
-#     - 10
-#     - 20
-#     - 30
-#   gamma: 0.1
+  milestones:
+    - 30
+    - 40
+  gamma: 0.1
 
 batch_size: 8
 epochs: 50

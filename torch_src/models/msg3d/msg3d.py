@@ -2,10 +2,10 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
-from msg3d.ms_gcn import MultiScale_GraphConv as MS_GCN
-from msg3d.ms_tcn import MultiScale_TemporalConv as MS_TCN
-from msg3d.ms_gtcn import SpatialTemporal_MS_GCN, UnfoldTemporalWindows
-from msg3d.mlp import MLP
+from models.msg3d.ms_gcn import MultiScale_GraphConv as MS_GCN
+from models.msg3d.ms_tcn import MultiScale_TemporalConv as MS_TCN
+from models.msg3d.ms_gtcn import SpatialTemporal_MS_GCN, UnfoldTemporalWindows
+from models.msg3d.mlp import MLP
 
 
 class MS_G3D(nn.Module):

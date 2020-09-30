@@ -2,9 +2,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from msg3d.ms_tcn import MultiScale_TemporalConv as MS_TCN
-from msg3d.mlp import MLP
-from msg3d.activation import activation_factory
+from models.msg3d.mlp import MLP
+from models.msg3d.activation import activation_factory
 from util.graph import get_k_adjacency
 
 

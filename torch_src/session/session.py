@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from progress import ProgressLogger, MetricsContainer
-from config import load_and_merge_configuration
+from config import load_and_merge_configuration, save_configuration
 from metrics import MultiClassAccuracy, TopKAccuracy, SimpleMetric
 from util.graph import Graph
 from util.dynamic_import import import_model, import_dataset_constants
@@ -29,9 +29,10 @@ class Session:
             self._is_resume = False
             self.session_id = time.strftime(f"{self.session_type}_%Y_%m_%d-%H_%M_%S")
 
-        self.log_path = os.path.join(self._base_config.out_path, self.session_id, "logs")
-        self.checkpoint_path = os.path.join(self._base_config.out_path, self.session_id, "checkpoints")
-        self.config_path = os.path.join(self._base_config.out_path, self.session_id, "config.yaml")
+        self.out_path = os.path.join(self._base_config.out_path, self.session_id)
+        self.log_path = os.path.join(self.out_path, "logs")
+        self.checkpoint_path = os.path.join(self.out_path, "checkpoints")
+        self.config_path = os.path.join(self.out_path, "config.yaml")
 
         if self._is_resume and os.path.exists(self.config_path):
             load_and_merge_configuration(self._base_config, self.config_path)
@@ -106,6 +107,9 @@ class Session:
             print(f"Model - Trainable parameters: {num_trainable_params:n}")
             if kwargs.get("print_model", False):
                 print(model)
+
+    def save_base_configuration(self):
+        save_configuration(self._base_config, self.config_path)
 
     @staticmethod
     def build_metrics(k: int = 5, additional_metrics: dict = None) -> MetricsContainer:

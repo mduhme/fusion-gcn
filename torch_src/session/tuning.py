@@ -30,9 +30,9 @@ class TuningSession(TrainingSession):
         results_dir = (os.environ.get("TEST_TMPDIR") or os.environ.get("TUNE_RESULT_DIR") or os.path.expanduser(
             "~/ray_results"))
 
-        super()._make_paths()
         tune_log_path = os.path.join(results_dir, self.session_id)
         os.makedirs(tune_log_path, exist_ok=True)
+        os.makedirs(self.out_path, exist_ok=True)
         metric = kwargs.get("metric", "mean_accuracy")
         mode = kwargs.get("mode", "max")
 
@@ -56,7 +56,10 @@ class TuningSession(TrainingSession):
 
         # TODO search algorithm?
         df = analysis.dataframe(metric, mode)
+        df.to_pickle(os.path.join(self.out_path, "results.pkl"))
 
-        df.to_pickle(os.path.join(self.log_path, "results.pkl"))
-        with pd.ExcelWriter(os.path.join(self.log_path, "results.xlsx")) as writer:
-            df.to_excel(writer)
+        try:
+            with pd.ExcelWriter(os.path.join(self.out_path, "results.xlsx")) as writer:
+                df.to_excel(writer)
+        except ModuleNotFoundError as e:
+            print("Failed to write tuning result:", e)

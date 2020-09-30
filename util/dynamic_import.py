@@ -34,7 +34,8 @@ def import_model(name: str, class_name: str = "Model") -> type:
     :param class_name: model class name
     :return: model class type
     """
-    return import_names(f"{name}.{name}", [class_name])[0]
+    name = name.lower()
+    return import_names(f"models.{name}.{name}", [class_name])[0]
 
 
 def import_dataset_constants(dataset: str, names: Sequence[str]) -> list:
@@ -46,4 +47,5 @@ def import_dataset_constants(dataset: str, names: Sequence[str]) -> list:
     :param names: which objects to import
     :return: imported objects
     """
+    dataset = dataset.lower().replace("-", "_")
     return import_names(f"datasets.{dataset}.constants", names)

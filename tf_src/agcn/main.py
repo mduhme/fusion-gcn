@@ -4,7 +4,7 @@ from tqdm import tqdm
 from sys import stdout
 from itertools import chain
 
-from tfmodels.agcn.config import get_config
+from tf_src.agcn.config import get_config
 from datasets.ntu_rgb_d.constants import skeleton_edges, data_shape
 from util.graph import Graph
 
@@ -17,7 +17,7 @@ for physical_device in physical_devices:
     tf.config.experimental.set_memory_growth(physical_device, True)
 
 from tensorflow import keras
-from tfmodels.agcn.model import create_model
+from tf_src.agcn.model import create_model
 
 
 def load_data(config):

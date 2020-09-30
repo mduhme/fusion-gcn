@@ -15,6 +15,28 @@ model_args_defaults = {
 }
 
 
+def get_available_models():
+    """
+    Read a list of available models from the folder structure.
+
+    :return: List of models
+    """
+    models_path = os.path.join(os.getcwd(), "torch_src", "models")
+    models = [f.name.upper() for f in os.scandir(models_path) if f.is_dir()]
+    return models
+
+
+def get_available_datasets():
+    """
+    Read a list of available datasets from the folder structure.
+
+    :return: List of datasets
+    """
+    datasets_path = os.path.join(os.getcwd(), "datasets")
+    datasets = [f.name.upper() for f in os.scandir(datasets_path) if f.is_dir()]
+    return datasets
+
+
 def get_configuration(session_types: tuple, optimizer_choices: tuple,
                       lr_scheduler_choices: tuple) -> argparse.Namespace:
     """
@@ -26,11 +48,11 @@ def get_configuration(session_types: tuple, optimizer_choices: tuple,
     parser.add_argument("-f", "--file", type=str,
                         help="Path to yaml-configuration file which take precedence"
                              " over command line parameters if specified.")
-    parser.add_argument("-m", "--model", default="agcn", type=str, choices=("agcn", "msg3d"),
+    parser.add_argument("-m", "--model", type=str, choices=get_available_models(),
                         help="Model to train or evaluate.")
-    parser.add_argument("-d", "--dataset", default="utd_mhad", type=str, choices=("ntu_rgb_d", "utd_mhad"),
+    parser.add_argument("-d", "--dataset", type=str, choices=get_available_datasets(),
                         help="Specify which dataset constants to load from the 'datasets' subdirectory.")
-    parser.add_argument("-s", "--session_type", type=str, default="training", choices=session_types,
+    parser.add_argument("-s", "--session_type", type=str, choices=session_types,
                         help="Session type: Training or Evaluation.")
     parser.add_argument("--in_path", type=str, help="Path to data sets for training/validation")
     parser.add_argument("--out_path", type=str,
@@ -43,19 +65,15 @@ def get_configuration(session_types: tuple, optimizer_choices: tuple,
                         help="Batch size of testing. Same as batch_size if unspecified.")
     parser.add_argument("--epochs", type=int, help="Number of epochs")
     parser.add_argument("--optimizer", type=str, choices=optimizer_choices, help="Optimizer to use")
-    parser.add_argument("--lr_scheduler", type=str, choices=lr_scheduler_choices, help="")
+    parser.add_argument("--lr_scheduler", type=str, choices=lr_scheduler_choices, help="Learning rate scheduler to use")
     parser.add_argument("--mixed_precision", action="store_true",
                         help="Use mixed precision instead of only float32.")
-    # parser.add_argument("--profiling", action="store_true", help="Enable profiling for TensorBoard")
     parser.add_argument("--profiling_batches", default=50, type=int, help="Number of batches for profiling")
-    # parser.add_argument("--debug", action="store_true", help="Smaller dataset and includes '--fixed_seed'.")
-    # parser.add_argument("--tuning", action="store_true",
-    #                     help="Activates hyper parameter tuning. Runs the training multiple times.")
     parser.add_argument("--disable_shuffle", action="store_true", help="Disables shuffling of data before training")
     parser.add_argument("--disable_logging", action="store_true", help="Disable printing status to console.")
     parser.add_argument("--disable_checkpointing", action="store_true",
                         help="Disables saving checkpoints during training.")
-    parser.add_argument("--fixed_seed", default=None, type=int, help="Set a fixed seed for all random functions.")
+    parser.add_argument("--fixed_seed", type=int, help="Set a fixed seed for all random functions.")
     parser.add_argument("--in_memory", action="store_true",
                         help="Load all datasets into main memory instead of mapping them.")
     parser.add_argument("--session_id", type=str, help="If given, resume the session with the given id.")
@@ -168,7 +186,8 @@ def load_and_merge_configuration(config: argparse.Namespace, in_path: str):
     """
     Loads a configuration from the given yaml file.
 
-    :param config: Loaded settings will be added to this object (overwrites existing values)
+    :param config: Loaded settings will be added to this object only if
+    not provided by command line parameters (or if command line parameter values are None)
     :param in_path: path of the yaml file
     """
     if not in_path.endswith(".yaml"):
@@ -178,4 +197,5 @@ def load_and_merge_configuration(config: argparse.Namespace, in_path: str):
         file_config = yaml.load(f, Loader=yaml.FullLoader)
 
     for key in file_config:
-        setattr(config, key, file_config[key])
+        if getattr(config, key, None) is None:
+            setattr(config, key, file_config[key])

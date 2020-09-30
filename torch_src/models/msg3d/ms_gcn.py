@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from msg3d.mlp import MLP
+from models.msg3d.mlp import MLP
 from util.graph import get_k_adjacency
 
 

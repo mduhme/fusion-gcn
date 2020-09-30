@@ -116,6 +116,24 @@ def get_configuration(session_types: tuple, optimizer_choices: tuple,
     return config
 
 
+def fill_model_config(config: dict, base_config: argparse.Namespace) -> dict:
+    """
+    Fill config with missing model-specific parameters.
+
+    :param config: config where the missing arguments will be added
+    :param base_config: base config read from configuration file / command line
+    :return: config
+    """
+    if config is None:
+        return make_default_model_config(base_config)
+
+    for key in model_args_defaults:
+        if key not in config:
+            attr = getattr(base_config, key, None)
+            config[key] = attr if attr is not None else model_args_defaults[key]
+    return config
+
+
 def make_default_model_config(base_config: argparse.Namespace) -> dict:
     """
     Copy all parameters that are relevant only to creation of model, optimizer, lr_scheduler, etc.
@@ -125,9 +143,8 @@ def make_default_model_config(base_config: argparse.Namespace) -> dict:
     """
     config = copy.deepcopy(model_args_defaults)
     for key in config:
-        if hasattr(base_config, key):
-            attr = getattr(base_config, key)
-            config[key] = attr if attr is not None else config[key]
+        attr = getattr(base_config, key, None)
+        config[key] = attr if attr is not None else config[key]
     return config
 
 

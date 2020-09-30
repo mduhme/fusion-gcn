@@ -1,9 +1,10 @@
 from typing import Tuple
 from torch.utils.data import DataLoader
 
-from config import make_default_model_config
+from config import fill_model_config
 from progress import ProgressLogger, CheckpointManager
 from data_input import SkeletonDataset
+import session_helper
 
 from session.session import Session
 from session.procedures.batch_train import BatchProcessor, get_batch_processor_from_config
@@ -51,8 +52,15 @@ class TrainingSession(Session):
         return progress, cp_manager
 
     def start(self, config: dict = None, **kwargs):
-        if config is None:
-            config = make_default_model_config(self._base_config)
+        """
+        Start the training session. This function is not modifying object state in any way due to
+        being called multiple times during hyperparameter tuning.
+
+        :param config: training specific configuration
+        :param kwargs: additional arguments
+        """
+
+        config = fill_model_config(config, self._base_config)
 
         reporter = kwargs.pop("reporter", None)
         batch_processor = config.get("batch_processor", None)
@@ -62,6 +70,8 @@ class TrainingSession(Session):
         training_data, validation_data = self._load_data(config.get("batch_size", self._base_config.batch_size),
                                                          config.get("test_batch_size",
                                                                     self._base_config.test_batch_size))
+
+        config = session_helper.prepare_learning_rate_scheduler_args(config, epochs, len(training_data))
         model, loss_function, optimizer, lr_scheduler = self._build_model(config)
         progress, cp_manager = self._build_logging(batch_processor, epochs, len(training_data),
                                                    len(validation_data), state_dict_objects={

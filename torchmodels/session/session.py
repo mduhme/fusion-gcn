@@ -15,6 +15,10 @@ from session.procedures.batch_train import BatchProcessor
 
 
 class Session:
+    """
+    Session is the base class for different session types like training, evaluation or profiling.
+    """
+
     def __init__(self, base_config, session_type: str):
         self._base_config = base_config
         self.session_type = session_type
@@ -35,7 +39,14 @@ class Session:
         self.disable_logging = self._base_config.disable_logging
         self.disable_checkpointing = self._base_config.disable_checkpointing
 
-    def _build_model(self, config: dict):
+    def _build_model(self, config: dict) -> tuple:
+        """
+        Build the network model, optimizer, loss function and learning rate scheduler given the.
+
+        :param config:
+        :return: tuple (model, loss function, optimizer, learning rate scheduler)
+        """
+
         skeleton_edges, data_shape, num_classes = import_dataset_constants(self._base_config.dataset, [
             "skeleton_edges", "data_shape", "num_classes"
         ])
@@ -53,11 +64,22 @@ class Session:
         return model, loss_function, optimizer, lr_scheduler
 
     def _make_paths(self):
+        """
+        Create paths for log files and checkpoints.
+        """
         os.makedirs(self.log_path, exist_ok=True)
         os.makedirs(self.checkpoint_path, exist_ok=True)
 
     @abc.abstractmethod
     def start(self, config: dict = None, **kwargs):
+        """
+        Start the session using the given config.
+        This function shouldn't modify object state and can hence be called in parallel using different configurations.
+        Missing arguments in the provided config are instead retrieved from the base config provided in the constructor.
+
+        :param config: run-specific configuration
+        :param kwargs: additional arguments
+        """
         pass
 
     def print_summary(self, model: torch.nn.Module = None, **kwargs):
@@ -66,7 +88,6 @@ class Session:
 
         :param model: network model
         """
-
         if self._base_config.disable_logging:
             return
 
@@ -87,9 +108,13 @@ class Session:
                 print(model)
 
     @staticmethod
-    def build_metrics(k: int = 5, additional_metrics: dict = None):
+    def build_metrics(k: int = 5, additional_metrics: dict = None) -> MetricsContainer:
         """
-        Create the metrics container to accumulate metrics.
+        Build different metrics. Metrics that are always included are learning rate, loss and accuracy.
+
+        :param k: k for top-k accuracy; if k <= 1: don't include top-k accuracy
+        :param additional_metrics: additional metrics as str: metric_type dictionary
+        :return: container that holds all metrics
         """
         # TODO add multi-class precision and recall
         # https://medium.com/data-science-in-your-pocket/calculating-precision-recall-for-multi-class-classification-9055931ee229

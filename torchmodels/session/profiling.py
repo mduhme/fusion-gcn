@@ -1,7 +1,7 @@
 import torch
 from torch.autograd.profiler import profile
 
-from config import make_default_model_config
+from config import fill_model_config
 from util.dynamic_import import import_dataset_constants
 from progress import wrap_color, AnsiColors
 
@@ -18,14 +18,13 @@ class ProfilingSession(Session):
         """
         Start profiling: https://pytorch.org/tutorials/recipes/recipes/profiler.html
         """
-        if config is None:
-            config = make_default_model_config(self._base_config)
+        config = fill_model_config(config, self._base_config)
 
+        num_batches = self._base_config.profiling_batches
         batch_size = config.get("batch_size", self._base_config.batch_size)
         data_shape, num_classes = import_dataset_constants(self._base_config.dataset, ["data_shape", "num_classes"])
         model, loss_function, optimizer, lr_scheduler = self._build_model(config)
 
-        num_batches = self._base_config.profiling_batches
         features_shape = (num_batches, batch_size, *data_shape)
         label_shape = (num_batches, batch_size)
         features = torch.randn(features_shape).float().cuda()

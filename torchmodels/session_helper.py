@@ -45,16 +45,19 @@ session_types: Dict[str, SessionType] = {
 }
 
 available_optimizers = {
-    "sgd": torch.optim.SGD,
-    "adam": torch.optim.Adam,
-    "adamw": torch.optim.AdamW
+    "SGD": torch.optim.SGD,
+    "ASGD": torch.optim.ASGD,
+    "ADAM": torch.optim.Adam,
+    "ADAMW": torch.optim.AdamW
 }
 
 # noinspection PyUnresolvedReferences
 available_lr_schedulers = {
     "multistep": torch.optim.lr_scheduler.MultiStepLR,
     "onecycle": torch.optim.lr_scheduler.OneCycleLR,
-    "exp": torch.optim.lr_scheduler.ExponentialLR
+    "exp": torch.optim.lr_scheduler.ExponentialLR,
+    "ca": torch.optim.lr_scheduler.CosineAnnealingLR,
+    "cawr": torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
 }
 
 
@@ -71,14 +74,24 @@ def create_session(base_config) -> SessionType:
 
 
 def create_optimizer(name: str, model: torch.nn.Module, lr: float, **optimizer_args) -> torch.optim.Optimizer:
-    name = name.lower()
+    name = name.upper()
     if name in available_optimizers:
         return available_optimizers[name](model.parameters(), lr, **optimizer_args)
     raise ValueError("Unsupported optimizer: " + name)
 
 
 def create_learning_rate_scheduler(name: str, optimizer: torch.optim.Optimizer, **scheduler_args):
-    name = name.lower()
+    name = name.lower() if name else ""
     if name in available_lr_schedulers:
         return available_lr_schedulers[name](optimizer, **scheduler_args)
     return None
+
+
+def prepare_learning_rate_scheduler_args(config: dict, epochs: int, steps_per_epoch: int) -> dict:
+    if config["lr_scheduler"] == "onecycle":
+        config["lr_scheduler_args"]["epochs"] = epochs
+        config["lr_scheduler_args"]["steps_per_epoch"] = steps_per_epoch
+    elif config["lr_scheduler"] == "ca":
+        config["lr_scheduler_args"]["T_max"] = steps_per_epoch
+
+    return config

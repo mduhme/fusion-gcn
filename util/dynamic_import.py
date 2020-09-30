@@ -14,9 +14,21 @@ def import_names(module_path: str, names: Sequence[str]) -> list:
     return [getattr(mod, name) for name in names if hasattr(mod, name)]
 
 
+def import_class(name: str) -> type:
+    """
+    Import a class from a file.
+
+    :param name: Path and name of the class, e.g. package.file.ClassName
+    :return: type of the class
+    """
+    i = name.rindex(".")
+    module_path, class_name = name[:i], name[i + 1:]
+    return import_names(module_path, [class_name])[0]
+
+
 def import_model(name: str, class_name: str = "Model") -> type:
     """
-    Import model class.
+    Import model class. Must have file structure: name.name.Model
 
     :param name: model name (e.g. agcn)
     :param class_name: model class name

@@ -52,7 +52,7 @@ def load_data(config):
         training_set = training_set.cache()
         test_set = test_set.cache()
 
-    if not config.no_shuffle:
+    if not config.disable_shuffle:
         shuffle_buffer_size = training_samples or 1000
         training_set = training_set.shuffle(shuffle_buffer_size)
 

@@ -4,11 +4,14 @@ from torch.utils.data import Dataset
 
 # https://pytorch.org/docs/stable/data.html
 class SkeletonDataset(Dataset):
-    def __init__(self, features_path: str, label_path: str, debug_mode: bool = False):
+    def __init__(self, features_path: str, label_path: str, **kwargs):
         # TODO option to load everything to ram (lower cpu load?)
-        self.features_data = np.load(features_path, mmap_mode="r")
+        if kwargs.get("in_memory", False):
+            self.features_data = np.load(features_path)
+        else:
+            self.features_data = np.load(features_path, mmap_mode="r")
         self.labels_data = np.load(label_path)
-        if debug_mode:
+        if kwargs.get("debug", False):
             self.features_data = self.features_data[:100]
             self.labels_data = self.labels_data[:100]
 

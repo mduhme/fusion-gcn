@@ -10,8 +10,17 @@ from tensorboard.program import TensorBoard
 
 from metrics import MetricsContainer
 
-BLUE = 34
-PURPLE = 35
+
+class AnsiColors:
+    BLACK = 30
+    RED = 31
+    GREEN = 32
+    YELLOW = 33
+    BLUE = 34
+    MAGENTA = 35
+    CYAN = 36
+    WHITE = 37
+    RESET = 39
 
 
 def wrap_color(msg: str, color_code: int):
@@ -32,7 +41,7 @@ def wrap_info(msg: str, ts: bool = True) -> str:
     :return: wrapped message
     """
     ts_fmt = f"[{datetime.now()}] " if ts else ""
-    return wrap_color(ts_fmt + msg, BLUE)
+    return wrap_color(ts_fmt + msg, AnsiColors.BLUE)
 
 
 def launch_tensorboard(log_path: str) -> str:
@@ -160,7 +169,7 @@ class ProgressLogger:
 
         fmt = self._get_update_format(str(total_elapsed_time) + " - ")
         fmt += " - " + metrics.format_all()
-        print(wrap_color(fmt, PURPLE), file=self._file)
+        print(wrap_color(fmt, AnsiColors.MAGENTA), file=self._file)
 
         # Write metrics to tensorboard
         for metric in metrics.get_metrics():
@@ -191,7 +200,7 @@ class ProgressLogger:
                 elapsed, seconds_per_step = self._modes_timer[i].get_stats(self._modes_total[i])
                 self._modes_fmt[i] = f"{self._modes_names[i]}: {self._modes_steps[i]}/" \
                                      f"{self._modes_total[i]} {elapsed}s {seconds_per_step:.3f}s/step"
-                self._modes_fmt[i] = wrap_color(self._modes_fmt[i], PURPLE)
+                self._modes_fmt[i] = wrap_color(self._modes_fmt[i], AnsiColors.MAGENTA)
         self._modes_timer[mode].start()
 
 

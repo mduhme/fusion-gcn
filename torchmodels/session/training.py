@@ -1,61 +1,32 @@
 from typing import Tuple
-import torch
 from torch.utils.data import DataLoader
 
-from progress import ProgressLogger, MetricsContainer, CheckpointManager
-from metrics import MultiClassAccuracy, TopKAccuracy, SimpleMetric
+from config import make_default_model_config
+from progress import ProgressLogger, CheckpointManager
 from data_input import SkeletonDataset
-from util.graph import Graph
-from util.dynamic_import import import_model, import_dataset_constants
 
 from session.session import Session
 from session.procedures.batch_train import BatchProcessor, get_batch_processor_from_config
-import training_helper
 import torch_util
 
 
 class TrainingSession(Session):
-    def __init__(self, base_config):
-        super().__init__(base_config, "training")
+    def __init__(self, base_config, name: str = "training"):
+        super().__init__(base_config, name)
 
     def _load_data(self, batch_size, test_batch_size) -> Tuple[DataLoader, DataLoader]:
-        shuffle = not (self._base_config.no_shuffle or self._base_config.debug)
+        shuffle = not self._base_config.disable_shuffle
         worker_init_fn = torch_util.set_seed if self._base_config.fixed_seed is not None else None
         training_data = DataLoader(
             SkeletonDataset(self._base_config.training_features_path, self._base_config.training_labels_path,
-                            self._base_config.debug), batch_size, shuffle=shuffle, drop_last=True,
+                            in_memory=self._base_config.in_memory),
+            batch_size, shuffle=shuffle, drop_last=True,
             worker_init_fn=worker_init_fn)
 
         validation_data = DataLoader(
             SkeletonDataset(self._base_config.validation_features_path, self._base_config.validation_labels_path),
             test_batch_size, shuffle=False, drop_last=False, worker_init_fn=worker_init_fn)
         return training_data, validation_data
-
-    @staticmethod
-    def build_metrics(k: int = 5):
-        """
-        Create the metrics container to accumulate metrics.
-        """
-        # TODO add multi-class precision and recall
-        # https://medium.com/data-science-in-your-pocket/calculating-precision-recall-for-multi-class-classification-9055931ee229
-        # https://towardsdatascience.com/multi-class-metrics-made-simple-part-i-precision-and-recall-9250280bddc2?gi=a28f7efba99e
-
-        metrics_list = [
-            MultiClassAccuracy("training_accuracy"),
-            MultiClassAccuracy("validation_accuracy")
-        ]
-        related_metrics = {
-            "loss": ["lr", "training_loss", "validation_loss"],
-            "accuracy": ["lr", "training_accuracy", "validation_accuracy"]
-        }
-
-        if k > 1:
-            metrics_list.append(TopKAccuracy(f"training_top{k}_accuracy"))
-            metrics_list.append(TopKAccuracy(f"validation_top{k}_accuracy"))
-            related_metrics[f"top{k}_accuracy"] = ["lr", f"training_top{k}_accuracy", f"validation_top{k}_accuracy"]
-
-        metrics_list.append(SimpleMetric("lr"))
-        return MetricsContainer(metrics_list, related_metrics)
 
     def _build_logging(self, batch_processor: BatchProcessor, epochs: int, training_data_size: int,
                        validation_data_size: int, state_dict_objects: dict) -> tuple:
@@ -75,28 +46,14 @@ class TrainingSession(Session):
             cp_manager = CheckpointManager(self.checkpoint_path, state_dict_objects)
 
         if progress or cp_manager:
-            super()._make_paths()
+            self._make_paths()
 
         return progress, cp_manager
 
-    def _build_model(self, config: dict):
-        skeleton_edges, data_shape, num_classes = import_dataset_constants(self._base_config.dataset, [
-            "skeleton_edges", "data_shape", "num_classes"
-        ])
-
-        graph = Graph(skeleton_edges)
-        # https://pytorch.org/docs/stable/generated/torch.nn.Module.html
-        # noinspection PyPep8Naming
-        Model = import_model(self._base_config.model)
-        model = Model(data_shape, num_classes, graph).cuda()
-        loss_function = torch.nn.CrossEntropyLoss().cuda()
-        optimizer = training_helper.get_optimizer(config["optimizer"], model, config["base_lr"],
-                                                  **config["optimizer_args"])
-        lr_scheduler = training_helper.get_learning_rate_scheduler(config["lr_scheduler"], optimizer,
-                                                                   **config["lr_scheduler_args"])
-        return model, loss_function, optimizer, lr_scheduler
-
     def start(self, config: dict = None, **kwargs):
+        if config is None:
+            config = make_default_model_config(self._base_config)
+
         reporter = kwargs.pop("reporter", None)
         batch_processor = config.get("batch_processor", None)
         if batch_processor is None:
@@ -113,9 +70,12 @@ class TrainingSession(Session):
                 "loss_function": loss_function,
                 "lr_scheduler": lr_scheduler
             })
-        metrics = self.build_metrics()
+        metrics = Session.build_metrics()
 
-        super().print_summary(model)
+        if progress:
+            self.print_summary(model, **kwargs)
+            print("Training configuration:", config)
+            progress.begin_session(self.session_type)
 
         for epoch in range(epochs):
             # Begin epoch
@@ -145,7 +105,7 @@ class TrainingSession(Session):
             val_acc = metrics["validation_accuracy"].value
 
             if reporter:
-                reporter(mean_loss=val_loss, mean_accuracy=val_acc, epoch=epoch, lr=lr)
+                reporter(mean_loss=val_loss, mean_accuracy=val_acc, lr=lr)
             if cp_manager:
                 cp_manager.save_checkpoint(epoch, val_acc)
             metrics.reset_all()
@@ -153,3 +113,6 @@ class TrainingSession(Session):
         # Save weights at the end of training
         if cp_manager:
             cp_manager.save_weights(model, self.session_id)
+
+        if progress:
+            progress.end_session()

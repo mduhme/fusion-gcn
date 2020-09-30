@@ -13,7 +13,7 @@ def get_config():
     parser.add_argument("-s", "--steps", default=[30, 40], type=int, nargs="+",
                         help="Epochs where learning rate decays")
     parser.add_argument("--weight_decay", default=0.0001, type=float, help="Weight decay")
-    parser.add_argument("--no_shuffle", action="store_true", help="Disables shuffling of data before training")
+    parser.add_argument("--disable_shuffle", action="store_true", help="Disables shuffling of data before training")
     parser.add_argument("--no_cache", action="store_true", help="Disables caching of samples in RAM")
     parser.add_argument("--profiling", action="store_true", help="Enable profiling for TensorBoard")
     parser.add_argument("--profiling_range", default=[200, 250], type=int, nargs="+", help="Steps for profiling")

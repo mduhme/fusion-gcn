@@ -3,7 +3,6 @@ fixed_seed: 1
 in_path: ..\preprocessed_data\NTU-RGB-D\xview
 out_path: ..\models\agcn\NTU-RGB-D\xview
 model: agcn
-session_type: training
 dataset: ntu_rgb_d
 
 base_lr: 0.1

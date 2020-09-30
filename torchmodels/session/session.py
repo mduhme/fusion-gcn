@@ -6,6 +6,10 @@ from torch.utils.data import DataLoader
 
 from progress import ProgressLogger, MetricsContainer
 from config import load_and_merge_configuration
+from metrics import MultiClassAccuracy, TopKAccuracy, SimpleMetric
+from util.graph import Graph
+from util.dynamic_import import import_model, import_dataset_constants
+import session_helper
 
 from session.procedures.batch_train import BatchProcessor
 
@@ -29,7 +33,24 @@ class Session:
             load_and_merge_configuration(self._base_config, self.config_path)
 
         self.disable_logging = self._base_config.disable_logging
-        self.disable_checkpointing = self._base_config.disable_logging
+        self.disable_checkpointing = self._base_config.disable_checkpointing
+
+    def _build_model(self, config: dict):
+        skeleton_edges, data_shape, num_classes = import_dataset_constants(self._base_config.dataset, [
+            "skeleton_edges", "data_shape", "num_classes"
+        ])
+
+        graph = Graph(skeleton_edges)
+        # https://pytorch.org/docs/stable/generated/torch.nn.Module.html
+        # noinspection PyPep8Naming
+        Model = import_model(self._base_config.model)
+        model = Model(data_shape, num_classes, graph).cuda()
+        loss_function = torch.nn.CrossEntropyLoss().cuda()
+        optimizer = session_helper.create_optimizer(config["optimizer"], model, config["base_lr"],
+                                                    **config["optimizer_args"])
+        lr_scheduler = session_helper.create_learning_rate_scheduler(config["lr_scheduler"], optimizer,
+                                                                     **config["lr_scheduler_args"])
+        return model, loss_function, optimizer, lr_scheduler
 
     def _make_paths(self):
         os.makedirs(self.log_path, exist_ok=True)
@@ -39,7 +60,7 @@ class Session:
     def start(self, config: dict = None, **kwargs):
         pass
 
-    def print_summary(self, model: torch.nn.Module = None):
+    def print_summary(self, model: torch.nn.Module = None, **kwargs):
         """
         Print session and model related information if given a model.
 
@@ -62,10 +83,41 @@ class Session:
         if model:
             num_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
             print(f"Model - Trainable parameters: {num_trainable_params:n}")
-            print(model)
+            if kwargs.get("print_model", False):
+                print(model)
 
-    def __str__(self):
-        return self.session_id
+    @staticmethod
+    def build_metrics(k: int = 5, additional_metrics: dict = None):
+        """
+        Create the metrics container to accumulate metrics.
+        """
+        # TODO add multi-class precision and recall
+        # https://medium.com/data-science-in-your-pocket/calculating-precision-recall-for-multi-class-classification-9055931ee229
+        # https://towardsdatascience.com/multi-class-metrics-made-simple-part-i-precision-and-recall-9250280bddc2?gi=a28f7efba99e
+
+        metrics_list = [
+            MultiClassAccuracy("training_accuracy"),
+            MultiClassAccuracy("validation_accuracy")
+        ]
+        related_metrics = {
+            "loss": ["lr", "training_loss", "validation_loss"],
+            "accuracy": ["lr", "training_accuracy", "validation_accuracy"]
+        }
+
+        if k > 1:
+            metrics_list.append(TopKAccuracy(f"training_top{k}_accuracy", k=k))
+            metrics_list.append(TopKAccuracy(f"validation_top{k}_accuracy", k=k))
+            related_metrics[f"top{k}_accuracy"] = ["lr", f"training_top{k}_accuracy", f"validation_top{k}_accuracy"]
+
+        if additional_metrics:
+            for metric_name in additional_metrics:
+                c = additional_metrics[metric_name]
+                metrics_list.append(c(f"training_{metric_name}"))
+                metrics_list.append(c(f"validation_{metric_name}"))
+                related_metrics[metric_name] = ["lr", f"training_{metric_name}", f"validation_{metric_name}"]
+
+        metrics_list.append(SimpleMetric("lr"))
+        return MetricsContainer(metrics_list, related_metrics)
 
     @staticmethod
     def train_epoch(batch_processor: BatchProcessor, model: torch.nn.Module, loss_function: torch.nn.Module,
@@ -106,3 +158,6 @@ class Session:
                 # Update progress bar
                 if progress:
                     progress.update_epoch_mode(1, metrics=metrics.format_all())
+
+    def __str__(self):
+        return self.session_id

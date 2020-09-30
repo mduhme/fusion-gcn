@@ -149,12 +149,12 @@ class Model(nn.Module):
         self.l4 = TCN_GCN_unit(64, 64, A)
         self.l5 = TCN_GCN_unit(64, 128, A, stride=2)
         self.l6 = TCN_GCN_unit(128, 128, A)
-        self.l7 = TCN_GCN_unit(128, 128, A)
+        # self.l7 = TCN_GCN_unit(128, 128, A)
         self.l8 = TCN_GCN_unit(128, 256, A, stride=2)
-        self.l9 = TCN_GCN_unit(256, 256, A)
+        # self.l9 = TCN_GCN_unit(256, 256, A)
         self.l10 = TCN_GCN_unit(256, 256, A)
 
-        self.fc = nn.Linear(256, num_classes)
+        self.fc = nn.Linear(128, num_classes)
         nn.init.normal_(self.fc.weight, 0, math.sqrt(2. / num_classes))
         bn_init(self.data_bn, 1)
 
@@ -171,10 +171,10 @@ class Model(nn.Module):
         x = self.l4(x)
         x = self.l5(x)
         x = self.l6(x)
-        x = self.l7(x)
-        x = self.l8(x)
-        x = self.l9(x)
-        x = self.l10(x)
+        # x = self.l7(x)
+        # x = self.l8(x)
+        # x = self.l9(x)
+        # x = self.l10(x)
 
         # N*M,C,T,V
         c_new = x.size(1)

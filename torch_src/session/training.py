@@ -87,6 +87,8 @@ class TrainingSession(Session):
             print("Training configuration:", config)
             progress.begin_session(self.session_type)
 
+        self.save_base_configuration()
+
         for epoch in range(epochs):
             # Begin epoch
             lr = optimizer.param_groups[0]["lr"]

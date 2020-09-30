@@ -3,7 +3,6 @@ import copy
 import os
 import yaml
 
-
 model_args_defaults = {
     "epochs": 50,
     "batch_size": 16,
@@ -22,7 +21,7 @@ def get_available_models():
     :return: List of models
     """
     models_path = os.path.join(os.getcwd(), "torch_src", "models")
-    models = [f.name.upper() for f in os.scandir(models_path) if f.is_dir()]
+    models = [f.name.upper() for f in os.scandir(models_path) if f.is_dir() and not f.name.startswith("__")]
     return models
 
 
@@ -33,7 +32,8 @@ def get_available_datasets():
     :return: List of datasets
     """
     datasets_path = os.path.join(os.getcwd(), "datasets")
-    datasets = [f.name.upper() for f in os.scandir(datasets_path) if f.is_dir()]
+    datasets = [f.name.upper().replace("_", "-") for f in os.scandir(datasets_path) if
+                f.is_dir() and not f.name.startswith("__")]
     return datasets
 
 

@@ -17,7 +17,7 @@ inertial_shape = (inertial_max_frames, 6)
 rgb_shape = (rgb_max_frames, 480, 640, 3)
 depth_shape = (depth_max_frames, 240, 320)
 
-data_shape = (1, skeleton_max_frames, 20, 3)
+data_shape = (3, skeleton_max_frames, 20, 1)
 
 # 0 = wear inertial sensor on right wrist | 1 = wear inertial sensor on right thigh
 actions = [

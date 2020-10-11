@@ -8,16 +8,19 @@ skeleton_data_path = "Skeleton"
 training_subjects = (0, 2, 4, 6)
 test_subjects = (1, 3, 5, 7)
 
-skeleton_max_frames = 125
-inertial_max_frames = 326
-rgb_max_frames = 96
-depth_max_frames = 125
-skeleton_shape = (skeleton_max_frames, 20, 3)
-inertial_shape = (inertial_max_frames, 6)
-rgb_shape = (rgb_max_frames, 480, 640, 3)
-depth_shape = (depth_max_frames, 240, 320)
+skeleton_frame_idx = 2
+inertial_frame_idx = 0
+depth_frame_idx = 2
+skeleton_max_sequence_length = 128  # 125 actually but 128 is multiple of 8
+inertial_max_sequence_length = 326
+rgb_max_sequence_length = 96
+depth_max_sequence_length = 128
+skeleton_shape = (skeleton_max_sequence_length, 20, 3)
+inertial_shape = (inertial_max_sequence_length, 6)
+rgb_shape = (rgb_max_sequence_length, 480, 640, 3)
+depth_shape = (depth_max_sequence_length, 240, 320)
 
-data_shape = (3, skeleton_max_frames, 20, 1)
+data_shape = (3, skeleton_max_sequence_length, 20, 1)
 
 # 0 = wear inertial sensor on right wrist | 1 = wear inertial sensor on right thigh
 actions = [

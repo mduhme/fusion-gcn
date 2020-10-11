@@ -1,7 +1,7 @@
-import numpy as np
 import os
-from typing import List
+from typing import List, Tuple
 
+from util.preprocessing.data_loader import MatlabLoader, RGBVideoLoader
 from datasets.utd_mhad.constants import *
 
 
@@ -35,7 +35,24 @@ def get_files(data_path: str):
     return [parse_file_name(fn) for fn in files if os.path.splitext(fn)[1] in (".mat", ".avi")]
 
 
-def split_set(file_list: List[FileMetaData]):
-    training_set = [f for f in file_list if f.subject in training_subjects]
-    validation_set = [f for f in file_list if f.subject in test_subjects]
+def get_split_paths(cf, out_file_prefix: str) -> Tuple[str, str, str, str]:
+    train_features_path = os.path.join(cf.out_path, f"{out_file_prefix}train_features.npy")
+    val_features_path = os.path.join(cf.out_path, f"{out_file_prefix}val_features.npy")
+    train_labels_path = os.path.join(cf.out_path, f"{out_file_prefix}train_labels.npy")
+    val_labels_path = os.path.join(cf.out_path, f"{out_file_prefix}val_labels.npy")
+    return train_features_path, val_features_path, train_labels_path, val_labels_path
+
+
+def split_data(data_files: List[FileMetaData], training_sub: Tuple[int],
+               validation_sub: Tuple[int]) -> Tuple[List[FileMetaData], List[FileMetaData]]:
+    training_set = [elem for elem in data_files if elem.subject in training_sub]
+    validation_set = [elem for elem in data_files if elem.subject in validation_sub]
     return training_set, validation_set
+
+
+SkeletonLoader = MatlabLoader("d_skel", skeleton_frame_idx, skeleton_max_sequence_length, skeleton_shape, np.float32,
+                              (2, 0, 1))
+InertialLoader = MatlabLoader("d_iner", inertial_frame_idx, inertial_max_sequence_length, inertial_shape, np.float32,
+                              (0, 1))
+DepthLoader = MatlabLoader("d_depth", depth_frame_idx, depth_max_sequence_length, depth_shape, np.uint16, (2, 0, 1))
+RGBLoader = RGBVideoLoader(rgb_max_sequence_length, rgb_shape, np.uint8)

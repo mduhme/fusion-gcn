@@ -4,19 +4,12 @@ model: agcn
 dataset: UTD-MHAD
 session_type: training
 
-base_lr: 0.005
-optimizer: SGD
+base_lr: 0.0006
+optimizer: ADAM
 optimizer_args:
-  momentum: 0.9
-  nesterov: true
   weight_decay: 0.01
 
-lr_scheduler: multistep
-lr_scheduler_args:
-  milestones:
-    - 30
-    - 40
-  gamma: 0.1
+lr_scheduler: ca
 
 batch_size: 8
 epochs: 50

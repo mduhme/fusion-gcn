@@ -110,7 +110,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     video_files = [f.name for f in os.scandir(args.in_path) if f.is_file() and f.name.endswith(".avi")]
-    video_files.sort()
 
     os.makedirs(args.out_path, exist_ok=True)
     with OpenPose(args.openpose_binary_path, args.openpose_python_path) as openpose:
@@ -118,6 +117,7 @@ if __name__ == "__main__":
         for video_file in tqdm(video_files, "Run OpenPose on video files", total=(1 if args.debug else None)):
             v = cv2.VideoCapture(os.path.join(args.in_path, video_file))
             pose_predicted_frames = openpose.estimate_pose_video(v)
+            v.release()
 
             # shape of skeletons is (num_frames, max_bodies_per_frame, num_joints, 3)
             # 3-vector is: x-coord, y-coord, probability
@@ -132,7 +132,7 @@ if __name__ == "__main__":
                 skeletons[frame_idx, :num_bodies] = pose_frame.poseKeypoints.astype(skeletons.dtype)
 
             np.save(os.path.join(args.out_path, f"{os.path.splitext(video_file)[0]}_skeleton.npy"), skeletons)
-            v.release()
+
             if args.output_images:
                 image_out_path = os.path.join(args.out_path, os.path.splitext(video_file)[0])
                 os.makedirs(image_out_path, exist_ok=True)

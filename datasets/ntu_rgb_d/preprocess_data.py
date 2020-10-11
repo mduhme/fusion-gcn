@@ -50,7 +50,7 @@ def process_skeletons(skeletons: List[SkeletonMetaData], processed_data_path: st
                 #         Maximum number of frames (= 300),
                 #         Number of joints (= 25),
                 #         XYZ (= 3)
-                skeleton_data = np.zeros((len(subset_samples), max_body_true, max_frames, num_joints, 3),
+                skeleton_data = np.zeros((len(subset_samples), max_body_true, max_sequence_length, num_joints, 3),
                                          dtype=np.float32)
 
                 # Fill large array with data from each sample

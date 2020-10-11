@@ -5,7 +5,7 @@ training_subjects = (1, 2, 4, 5, 8, 9, 13, 14, 15, 16, 17, 18, 19, 25, 27, 28, 3
 training_cameras = (2, 3)
 max_body_true = 2
 max_body_kinect = 4
-max_frames = 300
+max_sequence_length = 300
 data_shape = (3, 300, 25, 2)
 
 actions = [

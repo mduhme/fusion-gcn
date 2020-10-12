@@ -6,11 +6,14 @@ import session_helper
 # noinspection PyUnusedLocal
 def make_tune_config(base_config) -> dict:
     config = {
-        # "batch_size": tune.grid_search([4, 8, 16, 32]),
-        "base_lr": tune.grid_search([0.001, 0.005, 0.01]),
-        "optimizer": tune.grid_search(list(session_helper.available_optimizers.keys())),
-        "lr_scheduler": tune.grid_search([None] + list(session_helper.available_lr_schedulers.keys())),
-        "optimizer_args/weight_decay": tune.grid_search([0., 0.0001, 0.001, 0.01])
+        "batch_size": tune.grid_search([4, 8]),
+        "base_lr": tune.grid_search([0.001, 0.005]),
+        "optimizer": "ADAM",
+        # "lr_scheduler": "multistep",
+        # "optimizer": tune.grid_search(list(session_helper.available_optimizers.keys())),
+        "lr_scheduler": tune.grid_search(list(session_helper.available_lr_schedulers.keys())),
+        "optimizer_args/weight_decay": tune.grid_search([0., 0.0001, 0.001, 0.01]),
+        # "lr_scheduler_args/gamma": tune.grid_search([0.1, 0.2])
     }
     return config
 

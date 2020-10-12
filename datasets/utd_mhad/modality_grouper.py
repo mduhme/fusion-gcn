@@ -18,11 +18,12 @@ class DataGroup:
         self.processors = processors
 
     @staticmethod
-    def create(files: Dict[str, Tuple[List[FileMetaData], Processor]]):
+    def create(files: List[Tuple[List[FileMetaData], Processor]]):
         assert len(files) > 0, "Must specify at least one modality"
 
-        modalities = [k for k in files]
-        modality_files = [files[k][0] for k in files]
+        modalities = [k[1].name for k in files]
+        modality_files = [k[0] for k in files]
+        processors = {modality: processor[1] for modality, processor in zip(modalities, files)}
         data_list = []
         num_modalities = len(modalities)
         num_samples = len(modality_files[0])
@@ -45,8 +46,7 @@ class DataGroup:
             data_list.append(metadata)
 
         columns = ["Subject", "Trial", "Action", *modalities]
-        loaders = {k: files[k][1] for k in modalities}
-        return DataGroup(pd.DataFrame(data_list, columns=columns), loaders)
+        return DataGroup(pd.DataFrame(data_list, columns=columns), processors)
 
     def _get_interpolators(self, splits: dict, main_modality: str, interpolators: dict) -> dict:
         """
@@ -117,6 +117,7 @@ class DataGroup:
 
             # Map modality to a generator that loads samples from files
             input_sample_iter = {k: self.processors[k].load_samples(files[k]) for k in files}
+            # input_samples_iter = (dict(zip(input_sample_iter.keys(), tp)) for tp in zip(*input_sample_iter.values()))
 
             # Map modality to a generator that processes loaded samples
             processed_sample_iter = {

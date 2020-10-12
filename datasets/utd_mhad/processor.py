@@ -6,6 +6,7 @@ import numpy as np
 
 import datasets.utd_mhad.io as io
 import util.preprocessing.skeleton as skeleton_util
+import util.preprocessing.signal as signal_util
 from util.preprocessing.data_loader import Loader, MatlabLoader
 from util.preprocessing.data_writer import MemoryMappedArray
 
@@ -122,7 +123,7 @@ class MatlabInputProcessor(Processor):
 
 class SkeletonProcessor(MatlabInputProcessor):
     def __init__(self):
-        super().__init__("skeleton", io.SkeletonLoader)
+        super().__init__("Skeleton", io.SkeletonLoader)
 
     def _get_output_shape(self, mode: str, num_samples: int, max_sequence_length: int = None):
         # self.loader.input_shape is (num_frames, num_joints[=20], num_channels[=3])
@@ -147,16 +148,22 @@ class SkeletonProcessor(MatlabInputProcessor):
 
 
 class InertialProcessor(MatlabInputProcessor):
-    def __init__(self):
-        super().__init__("inertial", io.InertialLoader)
+    def __init__(self, **kwargs):
+        super().__init__("Inertial", io.InertialLoader)
+        self.signal_colors = kwargs.get("signal_colors", None)
+        if self.signal_colors is not None:
+            assert len(self.signal_colors) == self.loader.input_shape[-1]
 
     def _process_sample(self, sample: np.ndarray, sample_idx: int, mode: str, **kwargs) -> np.ndarray:
-        return sample
+        if mode == "signal_image":
+            return signal_util.compute_signal_image(sample)
+
+        return signal_util.normalize_signal(sample)
 
 
 class DepthProcessor(MatlabInputProcessor):
     def __init__(self):
-        super().__init__("depth", io.DepthLoader)
+        super().__init__("Depth", io.DepthLoader)
 
     def _process_sample(self, sample: np.ndarray, sample_idx: int, mode: str, **kwargs) -> np.ndarray:
         return sample
@@ -164,10 +171,7 @@ class DepthProcessor(MatlabInputProcessor):
 
 class RGBProcessor(Processor):
     def __init__(self):
-        super().__init__("rgb", io.RGBLoader)
-
-    def load_samples(self, files: Union[str, List[str]]) -> np.ndarray:
-        pass
+        super().__init__("RGB", io.RGBLoader)
 
     def compute_sequence_lengths(self, files: List[str]) -> np.ndarray:
         num_frames = []

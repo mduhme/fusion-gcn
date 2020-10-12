@@ -17,7 +17,7 @@ inertial_max_sequence_length = 326
 rgb_max_sequence_length = 96
 depth_max_sequence_length = 128
 skeleton_shape = (skeleton_max_sequence_length, 20, 3)
-inertial_shape = (inertial_max_sequence_length, 6)
+inertial_shape = (inertial_max_sequence_length, 6)  # 3x acceleration + 3x rotation
 rgb_shape = (rgb_max_sequence_length, 480, 640, 3)
 depth_shape = (depth_max_sequence_length, 240, 320)
 

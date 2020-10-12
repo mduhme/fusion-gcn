@@ -4,6 +4,9 @@ import os
 import numpy as np
 import pandas as pd
 
+from tqdm import tqdm
+from sys import stdout
+
 from datasets.utd_mhad.interpolator import NearestNeighborInterpolator
 from datasets.utd_mhad.processor import Processor
 from datasets.utd_mhad.io import FileMetaData
@@ -102,16 +105,34 @@ class DataGroup:
         max_sequence_length = None if main_modality is None else self.processors[
             main_modality].loader.max_sequence_length
 
-        # Process data and interpolate
-        for modality in self.processors:
-            for split_name, split in splits.items():
-                sample_indices = np.flatnonzero(self.data["Subject"].isin(split))
-                files_subset = self.data.iloc[sample_indices][modality]
-                samples = self.processors[modality].load_samples(files_subset)
-                modality_out_path = os.path.join(out_path, f"{modality.lower()}_{split_name}_features")
-                self.processors[modality].process(modality_out_path, samples, len(files_subset.index), modes[modality],
-                                                  interpolator=interpolators[split_name][modality],
-                                                  max_sequence_length=max_sequence_length)
+        # Process all modalities for each split
+        for split_name, split in splits.items():
+            print(f"Split '{split_name}' - Modalities: {', '.join(self.processors.keys())}")
+            sample_indices = np.flatnonzero(self.data["Subject"].isin(split))
+            num_samples = len(sample_indices)
+            out_paths = {k: os.path.join(out_path, f"{k.lower()}_{split_name}_features") for k in self.processors}
+
+            # Map modality to a list of files defined by the split
+            files = {k: self.data.iloc[sample_indices][k] for k in self.processors}
+
+            # Map modality to a generator that loads samples from files
+            input_sample_iter = {k: self.processors[k].load_samples(files[k]) for k in files}
+
+            # Map modality to a generator that processes loaded samples
+            processed_sample_iter = {
+                k: self.processors[k].process(out_paths[k],
+                                              input_sample_iter[k],
+                                              num_samples,
+                                              modes[k],
+                                              interpolator=interpolators[split_name][k],
+                                              max_sequence_length=max_sequence_length)
+                for k in input_sample_iter
+            }
+
+            for processed_samples in tqdm(zip(*processed_sample_iter.values()), "Processing samples", num_samples,
+                                          file=stdout):
+                # Map modality to each processed sample
+                sample_group = dict(zip(self.processors.keys(), processed_samples))
 
     def produce_labels(self, splits: Dict[str, tuple] = None) -> Union[np.ndarray, Dict[str, np.ndarray]]:
         """

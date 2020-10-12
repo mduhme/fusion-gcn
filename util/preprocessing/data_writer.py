@@ -10,7 +10,8 @@ class MemoryMappedArray:
         self.data = None
 
     def create_file(self):
-        self.data = np.memmap(self.out_path, self.dtype, "w+", 128, self.shape)
+        if self.out_path:
+            self.data = np.memmap(self.out_path, self.dtype, "w+", 128, self.shape)
 
     def close_file(self):
         if self.data is not None:

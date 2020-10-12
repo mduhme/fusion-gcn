@@ -1,10 +1,7 @@
 import abc
 from typing import List, Union, Iterable
-from sys import stdout
 import numpy as np
 import cv2
-
-from tqdm import tqdm
 
 import datasets.utd_mhad.io as io
 from util.preprocessing.data_loader import Loader, MatlabLoader
@@ -47,15 +44,17 @@ class Processor:
         pass
 
     @abc.abstractmethod
-    def process(self, out_path: str, samples: Iterable[np.ndarray], num_samples: int, mode: str = None, **kwargs):
+    def process(self, out_path: str, samples: Iterable[np.ndarray], num_samples: int, mode: str = None, **kwargs) \
+            -> Iterable[np.ndarray]:
         """
         Process and save samples.
 
-        :param out_path: Path where the processed samples will be stored
+        :param out_path: Path where the processed samples will be stored. May be None so that no file will be written.
         :param samples: Iterable of samples
         :param num_samples: The number of samples to be processed
         :param mode: Optional mode that describes how to process the data.
         :param kwargs: Additional arguments
+        :return: A generator to iterate over processed samples
         """
         pass
 
@@ -75,14 +74,6 @@ class Processor:
         new_sample[:len(sample)] = sample
         return new_sample
 
-    def __enter__(self):
-        # TODO implement this
-        pass
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        # TODO implement this
-        pass
-
     def __str__(self):
         return self.name.capitalize() + "Processor"
 
@@ -96,13 +87,13 @@ class MatlabInputProcessor(Processor):
         return np.array([s.shape[0] for s in samples], dtype=np.int)
 
     def process(self, out_path: str, samples: Iterable[np.ndarray], num_samples: int, mode: str = None, **kwargs):
-        out_path += ".npy"
+        if out_path is not None:
+            out_path += ".npy"
         interpolator = kwargs.pop("interpolator", None)
         max_sequence_length = kwargs.pop("max_sequence_length", None)
         shape = tuple(self._get_output_shape(num_samples, max_sequence_length))
         with MemoryMappedArray(out_path, self.loader.target_type, shape) as data:
-            for sample_idx, sample in tqdm(enumerate(samples), f"Process {self.name} features", num_samples,
-                                           file=stdout):
+            for sample_idx, sample in enumerate(samples):
                 # Scale sequence data using given interpolator (interpolator stores target sequence length)
                 if interpolator:
                     sample = interpolator.interpolate(sample, sample_idx)
@@ -112,8 +103,11 @@ class MatlabInputProcessor(Processor):
                 # Process individual sample
                 sample = self._process_sample(sample, sample_idx, mode, **kwargs)
                 # Write sample to memory mapped file
-                data[sample_idx] = sample
-        return out_path
+                if out_path:
+                    data[sample_idx] = sample
+
+                # yield processed sample
+                yield sample
 
     def _get_output_shape(self, num_samples: int, max_sequence_length: int = None):
         shape = [num_samples, *self.loader.input_shape]

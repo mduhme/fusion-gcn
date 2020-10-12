@@ -1,8 +1,9 @@
 import abc
-import numpy as np
-import cv2
-from scipy.io import loadmat
 from typing import List, Union, Iterable
+
+import cv2
+import numpy as np
+from scipy.io import loadmat
 
 
 class Loader:

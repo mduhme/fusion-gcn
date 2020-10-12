@@ -4,11 +4,12 @@ Use Python 3.7 when configuring/compiling and executing this code.
 As of creation of this file (07.10.2020), Python 3.8+ is not working with compiled OpenPose.
 """
 
-import sys
 import os
-import numpy as np
-import cv2
+import sys
 from typing import Union, Sequence
+
+import cv2
+import numpy as np
 
 
 class OpenPose:

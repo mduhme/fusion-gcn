@@ -1,14 +1,13 @@
 import argparse
 import os
 import re
-import numpy as np
 from typing import List
-from tqdm import tqdm
 
-from util.preprocessing.skeleton import validate_skeleton_data, normalize_skeleton_data
+from tqdm import tqdm
 
 from datasets.ntu_rgb_d.constants import *
 from datasets.ntu_rgb_d.io import SkeletonMetaData, SkeletonSample
+from util.preprocessing.skeleton import validate_skeleton_data, normalize_skeleton_data
 
 
 def is_sample(skeleton: SkeletonMetaData, benchmark: str, subset: str):

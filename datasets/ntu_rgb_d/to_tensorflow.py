@@ -4,10 +4,8 @@ from typing import List
 
 import numpy as np
 import tensorflow as tf
-
 # noinspection PyUnresolvedReferences
 from tensorflow.train import Feature, Features, Example, BytesList, Int64List
-
 from tqdm import tqdm
 
 

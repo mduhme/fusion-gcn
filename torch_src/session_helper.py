@@ -1,10 +1,11 @@
 from typing import Dict
 
 import torch
+
 from config import make_default_model_config
+from session.session import Session
 from tune_config import make_tune_config
 from util.dynamic_import import import_class
-from session.session import Session
 
 
 class SessionType:

@@ -1,8 +1,9 @@
 import abc
+
 import torch
 
-from session.procedures.step import Step, DefaultStep, MixedPrecisionStep
 from session.procedures.serializer import StateDictSerializer
+from session.procedures.step import Step, DefaultStep, MixedPrecisionStep
 
 
 class BatchProcessor(StateDictSerializer):

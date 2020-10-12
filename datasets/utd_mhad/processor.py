@@ -1,12 +1,13 @@
 import abc
 from typing import List, Union, Iterable
-import numpy as np
+
 import cv2
+import numpy as np
 
 import datasets.utd_mhad.io as io
+import util.preprocessing.skeleton as skeleton_util
 from util.preprocessing.data_loader import Loader, MatlabLoader
 from util.preprocessing.data_writer import MemoryMappedArray
-import util.preprocessing.skeleton as skeleton_util
 
 
 class Processor:
@@ -91,7 +92,7 @@ class MatlabInputProcessor(Processor):
             out_path += ".npy"
         interpolator = kwargs.pop("interpolator", None)
         max_sequence_length = kwargs.pop("max_sequence_length", None)
-        shape = tuple(self._get_output_shape(num_samples, max_sequence_length))
+        shape = tuple(self._get_output_shape(mode, num_samples, max_sequence_length))
         with MemoryMappedArray(out_path, self.loader.target_type, shape) as data:
             for sample_idx, sample in enumerate(samples):
                 # Scale sequence data using given interpolator (interpolator stores target sequence length)
@@ -109,7 +110,7 @@ class MatlabInputProcessor(Processor):
                 # yield processed sample
                 yield sample
 
-    def _get_output_shape(self, num_samples: int, max_sequence_length: int = None):
+    def _get_output_shape(self, mode: str, num_samples: int, max_sequence_length: int = None):
         shape = [num_samples, *self.loader.input_shape]
         if max_sequence_length is not None:
             shape[1] = max_sequence_length
@@ -123,7 +124,7 @@ class SkeletonProcessor(MatlabInputProcessor):
     def __init__(self):
         super().__init__("skeleton", io.SkeletonLoader)
 
-    def _get_output_shape(self, num_samples: int, max_sequence_length: int = None):
+    def _get_output_shape(self, mode: str, num_samples: int, max_sequence_length: int = None):
         # self.loader.input_shape is (num_frames, num_joints[=20], num_channels[=3])
         # shape is (num_samples, num_channels[=3], num_frames, num_joints[=20], num_bodies[=1])
         return [

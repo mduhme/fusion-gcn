@@ -1,15 +1,15 @@
-from typing import Tuple, List, Dict, Union
 import copy
 import os
+from sys import stdout
+from typing import Tuple, List, Dict, Union
+
 import numpy as np
 import pandas as pd
-
 from tqdm import tqdm
-from sys import stdout
 
 from datasets.utd_mhad.interpolator import NearestNeighborInterpolator
-from datasets.utd_mhad.processor import Processor
 from datasets.utd_mhad.io import FileMetaData
+from datasets.utd_mhad.processor import Processor
 
 
 class DataGroup:

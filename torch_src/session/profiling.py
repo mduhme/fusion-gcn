@@ -2,10 +2,9 @@ import torch
 from torch.autograd.profiler import profile
 
 from config import fill_model_config
-from util.dynamic_import import import_dataset_constants
 from progress import wrap_color, AnsiColors
-
 from session.session import Session
+from util.dynamic_import import import_dataset_constants
 
 
 class ProfilingSession(Session):

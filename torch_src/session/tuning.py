@@ -1,13 +1,12 @@
 import os
+
 import pandas as pd
 import ray
 from ray import tune
 from ray.tune.schedulers import ASHAScheduler
-from ray.tune.suggest.hyperopt import HyperOptSearch
 
 import tune_config
 from progress import launch_tensorboard
-
 from session.training import TrainingSession
 
 

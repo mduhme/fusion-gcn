@@ -1,17 +1,17 @@
 import abc
 import os
 import time
+
 import torch
 from torch.utils.data import DataLoader
 
-from progress import ProgressLogger, MetricsContainer
+import session_helper
 from config import load_and_merge_configuration, save_configuration
 from metrics import MultiClassAccuracy, TopKAccuracy, SimpleMetric
-from util.graph import Graph
-from util.dynamic_import import import_model, import_dataset_constants
-import session_helper
-
+from progress import ProgressLogger, MetricsContainer
 from session.procedures.batch_train import BatchProcessor
+from util.dynamic_import import import_model, import_dataset_constants
+from util.graph import Graph
 
 
 class Session:

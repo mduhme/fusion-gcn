@@ -1,8 +1,7 @@
 import os
-from typing import List, Tuple
 
-from util.preprocessing.data_loader import MatlabLoader, RGBVideoLoader
 from datasets.utd_mhad.constants import *
+from util.preprocessing.data_loader import MatlabLoader, RGBVideoLoader
 
 
 class FileMetaData:
@@ -33,21 +32,6 @@ def parse_file_name(file_name: str):
 def get_files(data_path: str):
     files = [os.path.join(data_path, file.name) for file in os.scandir(data_path) if file.is_file()]
     return [parse_file_name(fn) for fn in files if os.path.splitext(fn)[1] in (".mat", ".avi")]
-
-
-def get_split_paths(cf, out_file_prefix: str) -> Tuple[str, str, str, str]:
-    train_features_path = os.path.join(cf.out_path, f"{out_file_prefix}train_features.npy")
-    val_features_path = os.path.join(cf.out_path, f"{out_file_prefix}val_features.npy")
-    train_labels_path = os.path.join(cf.out_path, f"{out_file_prefix}train_labels.npy")
-    val_labels_path = os.path.join(cf.out_path, f"{out_file_prefix}val_labels.npy")
-    return train_features_path, val_features_path, train_labels_path, val_labels_path
-
-
-def split_data(data_files: List[FileMetaData], training_sub: Tuple[int],
-               validation_sub: Tuple[int]) -> Tuple[List[FileMetaData], List[FileMetaData]]:
-    training_set = [elem for elem in data_files if elem.subject in training_sub]
-    validation_set = [elem for elem in data_files if elem.subject in validation_sub]
-    return training_set, validation_set
 
 
 SkeletonLoader = MatlabLoader("d_skel", skeleton_frame_idx, skeleton_max_sequence_length, skeleton_shape, np.float32,

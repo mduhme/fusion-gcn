@@ -1,14 +1,14 @@
 from typing import Tuple
+
 from torch.utils.data import DataLoader
 
-from config import fill_model_config
-from progress import ProgressLogger, CheckpointManager
-from data_input import SkeletonDataset
 import session_helper
-
-from session.session import Session
-from session.procedures.batch_train import BatchProcessor, get_batch_processor_from_config
 import torch_util
+from config import fill_model_config
+from data_input import SkeletonDataset
+from progress import ProgressLogger, CheckpointManager
+from session.procedures.batch_train import BatchProcessor, get_batch_processor_from_config
+from session.session import Session
 
 
 class TrainingSession(Session):

@@ -5,8 +5,8 @@ from timeit import default_timer
 from typing import Tuple, List
 
 import torch
-from torch.utils.tensorboard import SummaryWriter
 from tensorboard.program import TensorBoard
+from torch.utils.tensorboard import SummaryWriter
 
 from metrics import MetricsContainer
 

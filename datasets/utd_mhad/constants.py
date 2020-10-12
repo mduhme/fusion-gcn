@@ -1,5 +1,6 @@
-import numpy as np
 import re
+
+import numpy as np
 
 depth_data_path = "Depth"
 inertial_data_path = "Inertial"

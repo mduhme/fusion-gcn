@@ -1,5 +1,5 @@
 import abc
-from typing import List, Union, Iterable
+from typing import List, Iterable
 
 import cv2
 import numpy as np
@@ -14,11 +14,11 @@ class Loader:
         self.target_type = target_type
 
     @abc.abstractmethod
-    def load_samples(self, files: Union[str, List[str]]) -> Union[np.ndarray, Iterable[np.ndarray]]:
+    def load_samples(self, files: Iterable[str]) -> Iterable[np.ndarray]:
         pass
 
     @abc.abstractmethod
-    def load_samples_merged(self, files: List[str]) -> np.ndarray:
+    def load_samples_merged(self, files: Iterable[str]) -> np.ndarray:
         pass
 
 
@@ -29,17 +29,13 @@ class MatlabLoader(Loader):
         self._mat_id = mat_id
         self._permutation = permutation
 
-    def load_samples(self, files: Union[str, List[str]]) -> Union[np.ndarray, Iterable[np.ndarray]]:
-        if type(files) is str:
-            return MatlabLoader.load_mat_to_numpy(files, self._mat_id, self.frame_idx, self.max_sequence_length,
-                                                  self.target_type, self._permutation)
-
+    def load_samples(self, files: Iterable[str]) -> Iterable[np.ndarray]:
         for file in files:
             yield MatlabLoader.load_mat_to_numpy(file, self._mat_id, self.frame_idx, self.max_sequence_length,
                                                  self.target_type, self._permutation)
 
-    def load_samples_merged(self, files: List[str]) -> np.ndarray:
-        return MatlabLoader.load_all_mat_to_numpy(files, self._mat_id, self.frame_idx, self.max_sequence_length,
+    def load_samples_merged(self, files: Iterable[str]) -> np.ndarray:
+        return MatlabLoader.load_all_mat_to_numpy(list(files), self._mat_id, self.frame_idx, self.max_sequence_length,
                                                   self.input_shape, self.target_type, self._permutation)
 
     @staticmethod
@@ -71,11 +67,11 @@ class RGBVideoLoader(Loader):
     def __init__(self, max_sequence_length: int, input_shape: tuple, target_type: type):
         super().__init__(-1, max_sequence_length, input_shape, target_type)
 
-    def load_samples(self, files: Union[str, List[str]]) -> Union[np.ndarray, Iterable[np.ndarray]]:
+    def load_samples(self, files: Iterable[str]) -> Iterable[np.ndarray]:
         for file in files:
             yield RGBVideoLoader.load_video(file, self.input_shape[1:], self.target_type)
 
-    def load_samples_merged(self, files: List[str]):
+    def load_samples_merged(self, files: Iterable[str]):
         raise RuntimeError("RGBVideoLoader: Merged allocation would require too much memory."
                            "Load and process each video individually instead.")
 

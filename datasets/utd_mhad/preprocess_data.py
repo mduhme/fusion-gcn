@@ -36,10 +36,6 @@ def preprocess(cf: argparse.Namespace):
         # (rgb_data_files, RGBProcessor())
     ])
 
-    # import util.preprocessing.cnn_features
-    # exit(0)
-
-    # TODO implement IMU processing (Signal images)
     # TODO implement RGB processing (CNN features, Cropped Skeleton-guided CNN features)
     # TODO implement Depth processing
     # TODO implement data visualization (matplotlib) via grouper
@@ -50,8 +46,8 @@ def preprocess(cf: argparse.Namespace):
         np.save(os.path.join(cf.out_path, f"{split_name}_labels.npy"), labels)
 
     # Create features for each modality and write them to files
-    multi_modal_data_group.produce_features(cf.out_path, splits, "Skeleton", modes={
-        "Inertial": "signal_image"
+    multi_modal_data_group.produce_features(cf.out_path, splits, modes={
+        "Inertial": "signal_image_feature"
     })
 
 

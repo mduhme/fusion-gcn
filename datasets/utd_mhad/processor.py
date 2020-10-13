@@ -93,7 +93,7 @@ class MatlabInputProcessor(Processor):
             out_path += ".npy"
         interpolator = kwargs.pop("interpolator", None)
         max_sequence_length = kwargs.pop("max_sequence_length", None)
-        shape = tuple(self._get_output_shape(mode, num_samples, max_sequence_length))
+        shape = tuple(self._get_output_shape(mode, num_samples, max_sequence_length, **kwargs))
         with MemoryMappedArray(out_path, self.loader.target_type, shape) as data:
             for sample_idx, sample in enumerate(samples):
                 # Scale sequence data using given interpolator (interpolator stores target sequence length)
@@ -111,11 +111,15 @@ class MatlabInputProcessor(Processor):
                 # yield processed sample
                 yield sample
 
-    def _get_output_shape(self, mode: str, num_samples: int, max_sequence_length: int = None):
-        shape = [num_samples, *self.loader.input_shape]
+    @staticmethod
+    def _make_output_shape(input_shape: tuple, num_samples: int, max_sequence_length: int):
+        shape = [num_samples, *input_shape]
         if max_sequence_length is not None:
             shape[1] = max_sequence_length
         return shape
+
+    def _get_output_shape(self, mode: str, num_samples: int, max_sequence_length: int = None, **kwargs):
+        return MatlabInputProcessor._make_output_shape(self.loader.input_shape, num_samples, max_sequence_length)
 
     def _process_sample(self, sample: np.ndarray, sample_idx: int, mode: str, **kwargs) -> np.ndarray:
         return sample
@@ -125,7 +129,7 @@ class SkeletonProcessor(MatlabInputProcessor):
     def __init__(self):
         super().__init__("Skeleton", io.SkeletonLoader)
 
-    def _get_output_shape(self, mode: str, num_samples: int, max_sequence_length: int = None):
+    def _get_output_shape(self, mode: str, num_samples: int, max_sequence_length: int = None, **kwargs):
         # self.loader.input_shape is (num_frames, num_joints[=20], num_channels[=3])
         # shape is (num_samples, num_channels[=3], num_frames, num_joints[=20], num_bodies[=1])
         return [
@@ -154,10 +158,24 @@ class InertialProcessor(MatlabInputProcessor):
         if self.signal_colors is not None:
             assert len(self.signal_colors) == self.loader.input_shape[-1]
 
+    def _get_output_shape(self, mode: str, num_samples: int, max_sequence_length: int = None, **kwargs):
+        if mode == "signal_image":
+            sequence_length = max_sequence_length or self.loader.max_sequence_length
+            input_shape = signal_util.get_signal_image_shape(sequence_length, kwargs.get("signal_image_cutoff", False))
+            return num_samples, *input_shape
+        elif mode == "signal_image_feature":
+            input_shape = signal_util.get_signal_image_feature_shape(kwargs.get("signal_feature_model", None))
+            return MatlabInputProcessor._make_output_shape(input_shape, num_samples, max_sequence_length)
+
+        return super()._get_output_shape(mode, num_samples, max_sequence_length)
+
     def _process_sample(self, sample: np.ndarray, sample_idx: int, mode: str, **kwargs) -> np.ndarray:
         if mode == "signal_image":
-            return signal_util.compute_signal_image(sample)
+            return signal_util.compute_signal_image(sample, kwargs.get("signal_image_cutoff", False))
+        elif mode == "signal_image_feature":
+            return signal_util.compute_signal_image_feature(sample, kwargs.get("signal_feature_model", None))
 
+        # No special mode: Just return normalized input signal
         return signal_util.normalize_signal(sample)
 
 

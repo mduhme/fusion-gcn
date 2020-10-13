@@ -1,4 +1,10 @@
+import cv2
 import numpy as np
+
+from util.preprocessing.cnn_features import encode_sample, get_feature_size
+
+_signal_image_indices = [0, 1, 2, 3, 4, 5, 0, 2, 4, 1, 3, 5, 0, 3, 1, 4, 2, 5]
+_signal_image_indices2 = [0, 1, 2, 3, 4, 5, 0, 2, 4, 1, 3, 5, 0, 3, 1, 4, 2, 5, 0, 4, 1, 5, 0, 5]
 
 
 def normalize_signal(sample: np.ndarray) -> np.ndarray:
@@ -7,12 +13,12 @@ def normalize_signal(sample: np.ndarray) -> np.ndarray:
     return sample
 
 
-_signal_image_indices = [0, 1, 2, 3, 4, 5, 0, 2, 4, 1, 3, 5, 0, 3, 1, 4, 2, 5]
-_signal_image_indices2 = [0, 1, 2, 3, 4, 5, 0, 2, 4, 1, 3, 5, 0, 3, 1, 4, 2, 5, 0, 4, 1, 5, 0, 5]
-
-
-def signal_image_shape(sequence_length: int, cutoff: bool = False) -> tuple:
+def get_signal_image_shape(sequence_length: int, cutoff: bool = False) -> tuple:
     return (len(_signal_image_indices) if cutoff else len(_signal_image_indices2)), sequence_length
+
+
+def get_signal_image_feature_shape(model_name: str = None) -> tuple:
+    return get_feature_size(model_name),
 
 
 def compute_signal_image(sample: np.ndarray, cutoff: bool = False) -> np.ndarray:
@@ -38,5 +44,13 @@ def compute_signal_image(sample: np.ndarray, cutoff: bool = False) -> np.ndarray
     return signal_image
 
 
-def compute_signal_image_feature(sample: np.ndarray) -> np.ndarray:
-    pass
+def compute_signal_image_feature(sample: np.ndarray, model_name: str = None) -> np.ndarray:
+    # Compute signal image
+    signal_image = compute_signal_image(sample)
+    # Expand to RGB -> (H, W, C)
+    signal_image = cv2.cvtColor(signal_image, cv2.COLOR_GRAY2RGB)
+    # Move C to front -> (C, H, W)
+    signal_image = np.moveaxis(signal_image, -1, 0)
+    # Run feature encoding
+    feature = encode_sample(signal_image, model_name)
+    return feature

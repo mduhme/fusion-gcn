@@ -3,8 +3,8 @@ import os
 
 import datasets.utd_mhad.io as io
 from datasets.utd_mhad.constants import *
-from datasets.utd_mhad.modality_grouper import DataGroup
-from datasets.utd_mhad.processor import SkeletonProcessor, InertialProcessor, DepthProcessor, RGBProcessor
+from datasets.utd_mhad.datagroup import DataGroup
+from datasets.utd_mhad.processor import SkeletonProcessor, InertialProcessor, DepthProcessor, RGBVideoProcessor
 
 
 def get_configuration():
@@ -30,11 +30,16 @@ def preprocess(cf: argparse.Namespace):
     }
 
     multi_modal_data_group = DataGroup.create([
-        (skeleton_data_files, SkeletonProcessor()),
-        (inertial_data_files, InertialProcessor()),
-        # (depth_data_files, DepthProcessor()),
-        # (rgb_data_files, RGBProcessor())
-    ])
+        ("skeleton", skeleton_data_files, io.skeleton_loader),
+        ("inertial", inertial_data_files, io.inertial_loader),
+        ("depth", depth_data_files, io.depth_loader),
+        ("rgb", rgb_data_files, io.rgb_loader)
+    ], {
+        "skeleton": SkeletonProcessor,
+        "inertial": InertialProcessor,
+        # "depth": DepthProcessor,
+        # "rgb": RGBVideoProcessor
+    })
 
     # TODO implement RGB processing (CNN features, Cropped Skeleton-guided CNN features)
     # TODO implement Depth processing
@@ -46,9 +51,10 @@ def preprocess(cf: argparse.Namespace):
         np.save(os.path.join(cf.out_path, f"{split_name}_labels.npy"), labels)
 
     # Create features for each modality and write them to files
-    multi_modal_data_group.produce_features(cf.out_path, splits, modes={
-        "Inertial": "signal_image_feature"
-    })
+    multi_modal_data_group.produce_features(splits, modes={
+        "inertial": "signal_image_feature",
+        "rgb": "rgb_skeleton_patches"
+    }, out_path=cf.out_path)
 
 
 if __name__ == "__main__":

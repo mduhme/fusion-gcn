@@ -1,20 +1,25 @@
 import abc
-from typing import List, Iterable
+from typing import Any, Iterable, List
 
 import cv2
 import numpy as np
 from scipy.io import loadmat
 
 
-class Loader:
-    def __init__(self, frame_idx: int, max_sequence_length: int, input_shape: tuple, target_type: type):
-        self.frame_idx = frame_idx
+class SequenceStructure:
+    def __init__(self, max_sequence_length: int, input_shape: tuple, target_type: type):
         self.max_sequence_length = max_sequence_length
         self.input_shape = input_shape
         self.target_type = target_type
 
+
+class Loader:
+    def __init__(self, frame_idx: int, structure: SequenceStructure):
+        self.frame_idx = frame_idx
+        self.structure = structure
+
     @abc.abstractmethod
-    def load_samples(self, files: Iterable[str]) -> Iterable[np.ndarray]:
+    def load_samples(self, files: Iterable[str]) -> Iterable[Any]:
         pass
 
     @abc.abstractmethod
@@ -23,20 +28,20 @@ class Loader:
 
 
 class MatlabLoader(Loader):
-    def __init__(self, mat_id: str, frame_idx: int, max_sequence_length: int, input_shape: tuple, target_type: type,
-                 permutation: tuple):
-        super().__init__(frame_idx, max_sequence_length, input_shape, target_type)
+    def __init__(self, mat_id: str, frame_idx: int, structure: SequenceStructure, permutation: tuple):
+        super().__init__(frame_idx, structure)
         self._mat_id = mat_id
         self._permutation = permutation
 
     def load_samples(self, files: Iterable[str]) -> Iterable[np.ndarray]:
         for file in files:
-            yield MatlabLoader.load_mat_to_numpy(file, self._mat_id, self.frame_idx, self.max_sequence_length,
-                                                 self.target_type, self._permutation)
+            yield MatlabLoader.load_mat_to_numpy(file, self._mat_id, self.frame_idx, self.structure.max_sequence_length,
+                                                 self.structure.target_type, self._permutation)
 
     def load_samples_merged(self, files: Iterable[str]) -> np.ndarray:
-        return MatlabLoader.load_all_mat_to_numpy(list(files), self._mat_id, self.frame_idx, self.max_sequence_length,
-                                                  self.input_shape, self.target_type, self._permutation)
+        return MatlabLoader.load_all_mat_to_numpy(list(files), self._mat_id, self.frame_idx,
+                                                  self.structure.max_sequence_length, self.structure.input_shape,
+                                                  self.structure.target_type, self._permutation)
 
     @staticmethod
     def load_mat_to_numpy(file_name: str, mat_id: str, frame_dim: int, target_max_sequence_length: int,
@@ -64,36 +69,40 @@ class MatlabLoader(Loader):
 
 
 class RGBVideoLoader(Loader):
-    def __init__(self, max_sequence_length: int, input_shape: tuple, target_type: type):
-        super().__init__(-1, max_sequence_length, input_shape, target_type)
+    def __init__(self, structure: SequenceStructure):
+        super().__init__(-1, structure)
 
-    def load_samples(self, files: Iterable[str]) -> Iterable[np.ndarray]:
+    def load_samples(self, files: Iterable[str]) -> Iterable[cv2.VideoCapture]:
         for file in files:
-            yield RGBVideoLoader.load_video(file, self.input_shape[1:], self.target_type)
+            video = RGBVideoLoader.load_video(file)
+            yield video
+            video.release()
 
     def load_samples_merged(self, files: Iterable[str]):
         raise RuntimeError("RGBVideoLoader: Merged allocation would require too much memory."
                            "Load and process each video individually instead.")
 
     @staticmethod
-    def load_video(file_name: str, input_shape: tuple, target_type: type) -> np.ndarray:
-        video = cv2.VideoCapture(file_name)
-        num_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-        w, h = int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    def load_video(file_name: str) -> cv2.VideoCapture:
+        return cv2.VideoCapture(file_name)
 
-        if w != input_shape[1] or h != input_shape[0]:
-            video.release()
-            raise ValueError("Video frame dimension does not match input_shape")
-
-        output = np.empty((num_frames, *input_shape), dtype=target_type)
-        frame_idx = 0
-
+    def frames(self, video: cv2.VideoCapture) -> Iterable[np.ndarray]:
         while video.isOpened():
             ok, frame = video.read()
             if not ok:
                 break
-            output[frame_idx] = frame.astype(target_type)
-            frame_idx += 1
+            yield frame.astype(self.structure.target_type)
 
-        video.release()
+    def to_numpy(self, video: cv2.VideoCapture) -> np.ndarray:
+        num_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+        w, h = int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+        if w != self.structure.input_shape[1] or h != self.structure.input_shape[0]:
+            video.release()
+            raise ValueError("Video frame dimension does not match input_shape")
+
+        output = np.empty((num_frames, *self.structure.input_shape), dtype=self.structure.target_type)
+        for frame_idx, frame in enumerate(self.frames(video)):
+            output[frame_idx] = frame
+
         return output

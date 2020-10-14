@@ -1,14 +1,13 @@
 import os
 
 from datasets.utd_mhad.constants import *
-from util.preprocessing.data_loader import MatlabLoader, RGBVideoLoader
+from util.preprocessing.data_loader import SequenceStructure, MatlabLoader, RGBVideoLoader
 
 
 class FileMetaData:
     """
-    Stores file name and sample information for each skeleton
+    Stores file name, subject, trial and action label for each file.
     """
-
     def __init__(self, fn: str, subject: int, trial: int, action_label: int):
         assert subject >= 0 and trial >= 0 and action_label >= 0
         self.file_name = fn
@@ -34,9 +33,12 @@ def get_files(data_path: str):
     return [parse_file_name(fn) for fn in files if os.path.splitext(fn)[1] in (".mat", ".avi")]
 
 
-SkeletonLoader = MatlabLoader("d_skel", skeleton_frame_idx, skeleton_max_sequence_length, skeleton_shape, np.float32,
-                              (2, 0, 1))
-InertialLoader = MatlabLoader("d_iner", inertial_frame_idx, inertial_max_sequence_length, inertial_shape, np.float32,
-                              (0, 1))
-DepthLoader = MatlabLoader("d_depth", depth_frame_idx, depth_max_sequence_length, depth_shape, np.uint16, (2, 0, 1))
-RGBLoader = RGBVideoLoader(rgb_max_sequence_length, rgb_shape, np.uint8)
+skeleton_sequence_structure = SequenceStructure(skeleton_max_sequence_length, skeleton_shape, np.float32)
+inertial_sequence_structure = SequenceStructure(inertial_max_sequence_length, inertial_shape, np.float32)
+depth_sequence_structure = SequenceStructure(depth_max_sequence_length, depth_shape, np.uint16)
+rgb_sequence_structure = SequenceStructure(rgb_max_sequence_length, rgb_shape, np.uint8)
+
+skeleton_loader = MatlabLoader("d_skel", skeleton_frame_idx, skeleton_sequence_structure, (2, 0, 1))
+inertial_loader = MatlabLoader("d_iner", inertial_frame_idx, inertial_sequence_structure, (0, 1))
+depth_loader = MatlabLoader("d_depth", depth_frame_idx, depth_sequence_structure, (2, 0, 1))
+rgb_loader = RGBVideoLoader(rgb_sequence_structure)

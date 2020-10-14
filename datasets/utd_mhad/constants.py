@@ -2,6 +2,8 @@ import re
 
 import numpy as np
 
+from util.preprocessing.skeleton_patch_extractor import SkeletonPatchExtractor
+
 depth_data_path = "Depth"
 inertial_data_path = "Inertial"
 rgb_data_path = "RGB"
@@ -105,3 +107,23 @@ num_classes = len(actions)
 num_subjects = 8
 
 file_matcher = re.compile(r"a(\d+)_s(\d+)_t(\d+)_\S+")
+
+
+# KINECT CALIBRATION DATA from
+# Kinect 1 SDK -> NuiImageCamera.h
+# http://burrus.name/index.php/Research/KinectCalibration
+
+rgb_dim = np.array([640, 480], dtype=np.int)
+depth_dim = np.array([320, 240], dtype=np.int)
+
+f_color = 531.15
+f_depth = 285.63
+
+R = np.array([
+    [9.9984628826577793e-01, 1.2635359098409581e-03, -1.7487233004436643e-02],
+    [-1.4779096108364480e-03, 9.9992385683542895e-01, -1.2251380107679535e-02],
+    [1.7470421412464927e-02, 1.2275341476520762e-02, 9.9977202419716948e-01]
+])
+T = np.array([1.9985242312092553e-02, -7.4423738761617583e-04, -1.0916736334336222e-02]) * 2
+
+skeleton_patch_extractor = SkeletonPatchExtractor(f_color, f_depth, T, R, rgb_dim, depth_dim)

@@ -1,146 +1,135 @@
 import abc
-from typing import List, Union, Iterable
+import copy
+from typing import Any, Dict, Iterable, Optional
 
 import cv2
 import numpy as np
 
-import datasets.utd_mhad.io as io
-import util.preprocessing.skeleton as skeleton_util
 import util.preprocessing.signal as signal_util
-from util.preprocessing.data_loader import Loader, MatlabLoader
-from util.preprocessing.data_writer import MemoryMappedArray
+import util.preprocessing.skeleton as skeleton_util
+from util.preprocessing.data_loader import SequenceStructure
+from util.preprocessing.data_writer import FileWriter, NumpyWriter
+from util.preprocessing.interpolator import SampleInterpolator
 
 
 class Processor:
-    def __init__(self, name: str, loader: Loader):
-        self.name = name
-        self.loader = loader
-
-    def load_samples(self, files: Union[str, List[str]]) -> Union[np.ndarray, Iterable[np.ndarray]]:
+    def __init__(self, structure: SequenceStructure, mode: Optional[str], max_sequence_length: Optional[int]):
         """
-        Load one or multiple samples from file(s).
-
-        :param files: Single file (str) or multiple files (list of str)
-        :return: If given a single string, return sample as numpy array.
-        If given a list, return a generator to load and process samples sequentially.
+        :param structure: Structure that describes input/output data shape and type
+        :param mode: Optional mode that describes how to process the data.
+        :param max_sequence_length: If not None overwrites structure.max_sequence_length
         """
-        return self.loader.load_samples(files)
-
-    def load_samples_merged(self, files: List[str]) -> np.ndarray:
-        """
-        Load all samples to memory and merge them in a single array. High memory usage depending on data type.
-
-        :param files: list of files (str)
-        :return: Single numpy array that stores all data padded to max_sequence_length
-        """
-        return self.loader.load_samples_merged(files)
+        self.name = None
+        self.structure = copy.deepcopy(structure)
+        self.mode = mode
+        self.max_sequence_length = max_sequence_length or self.structure.max_sequence_length
 
     @abc.abstractmethod
-    def compute_sequence_lengths(self, files: List[str]) -> np.ndarray:
+    def collect(self, out_path: str, num_samples: int, **kwargs) -> FileWriter:
+        """
+        Return a FileWriter that can be passed to 'process' to store the processed sample.
+        Should be called like: 'with processor.collect(...) as writer' and 'process(..., writer=writer)'
+
+        :param out_path: Path where the processed samples will be stored.
+        :param num_samples: The number of samples to be processed
+        :return: file writer
+        """
+        pass
+
+    @abc.abstractmethod
+    def compute_sequence_lengths(self, raw_samples: Iterable[Any]) -> np.ndarray:
         """
         Compute length for each sequence in the given list of files.
 
-        :param files: list of files (str)
+        :param raw_samples: list of samples from a loader
         :return: 1D numpy array of size = len(files) that stores the length of each sequence
         """
         pass
 
-    @abc.abstractmethod
-    def process(self, out_path: str, samples: Iterable[np.ndarray], num_samples: int, mode: str = None, **kwargs) \
-            -> Iterable[np.ndarray]:
+    def process(self, sample, other_samples: Dict[str, np.ndarray], interpolator: Optional[SampleInterpolator],
+                writer: Optional[FileWriter], **kwargs):
         """
-        Process and save samples.
+        Process and optionally save a single sample.
 
-        :param out_path: Path where the processed samples will be stored. May be None so that no file will be written.
-        :param samples: Iterable of samples
-        :param num_samples: The number of samples to be processed
-        :param mode: Optional mode that describes how to process the data.
+        :param sample:
+        :param other_samples: Dictionary that maps modality name to associated 'sample' from other modalities
+        :param interpolator: Interpolator to interpolate the sample to a different sequence length
+        :param writer: Writer to collect the processed sample
         :param kwargs: Additional arguments
-        :return: A generator to iterate over processed samples
+        :return: The processed sample
         """
+        if interpolator:
+            sample = interpolator.interpolate(sample)
+
+        sample = self._pad_sequence(sample)
+        sample = self._process(sample, other_samples, **kwargs)
+
+        if writer:
+            writer.collect_next(sample)
+
+        return sample
+
+    @abc.abstractmethod
+    def _process(self, sample, other_samples: Dict[str, np.ndarray], **kwargs) -> np.ndarray:
         pass
 
-    def _pad_sample(self, sample: np.ndarray, target_sequence_length: int = None) -> np.ndarray:
+    def _pad_sequence(self, sequence: np.ndarray) -> np.ndarray:
         """
         Pad the given sequence with zeros to fill target_sequence_length elements.
 
-        :param sample: sample
-        :param target_sequence_length: Array target size: Pad target_sequence_length - len(sample) zeros.
-        If target_sequence_length is None use default modality sequence length.
-        :return: padded sample
+        :param sequence: sequence
+        :return: padded sequence
         """
-        shape = list(self.loader.input_shape)
-        if target_sequence_length is not None:
-            shape[0] = target_sequence_length
-        new_sample = np.zeros(shape, self.loader.target_type)
-        new_sample[:len(sample)] = sample
-        return new_sample
-
-    def __str__(self):
-        return self.name.capitalize() + "Processor"
+        shape = list(self.structure.input_shape)
+        shape[0] = self.max_sequence_length
+        new_sequence = np.zeros(shape, self.structure.target_type)
+        new_sequence[:len(sequence)] = sequence
+        return new_sequence
 
 
 class MatlabInputProcessor(Processor):
-    def __init__(self, name: str, loader: MatlabLoader):
-        super().__init__(name, loader)
+    def __init__(self, structure: SequenceStructure, mode: Optional[str], max_sequence_length: Optional[int]):
+        super().__init__(structure, mode, max_sequence_length)
 
-    def compute_sequence_lengths(self, files: List[str]) -> np.ndarray:
-        samples = self.loader.load_samples(files)
-        return np.array([s.shape[0] for s in samples], dtype=np.int)
+    def collect(self, out_path: str, num_samples: int, **kwargs) -> FileWriter:
+        out_path += ".npy"
+        shape = tuple(self._get_output_shape(num_samples, **kwargs))
+        return NumpyWriter(out_path, self.structure.target_type, shape)
 
-    def process(self, out_path: str, samples: Iterable[np.ndarray], num_samples: int, mode: str = None, **kwargs):
-        if out_path is not None:
-            out_path += ".npy"
-        interpolator = kwargs.pop("interpolator", None)
-        max_sequence_length = kwargs.pop("max_sequence_length", None)
-        shape = tuple(self._get_output_shape(mode, num_samples, max_sequence_length, **kwargs))
-        with MemoryMappedArray(out_path, self.loader.target_type, shape) as data:
-            for sample_idx, sample in enumerate(samples):
-                # Scale sequence data using given interpolator (interpolator stores target sequence length)
-                if interpolator:
-                    sample = interpolator.interpolate(sample, sample_idx)
+    def compute_sequence_lengths(self, raw_samples: Iterable[np.ndarray]) -> np.ndarray:
+        return np.array([s.shape[0] for s in raw_samples], dtype=np.int)
 
-                # Set fixed sequence length
-                sample = self._pad_sample(sample, max_sequence_length)
-                # Process individual sample
-                sample = self._process_sample(sample, sample_idx, mode, **kwargs)
-                # Write sample to memory mapped file
-                if out_path:
-                    data[sample_idx] = sample
-
-                # yield processed sample
-                yield sample
-
-    @staticmethod
-    def _make_output_shape(input_shape: tuple, num_samples: int, max_sequence_length: int):
+    def _make_simple_output_shape(self, input_shape: tuple, num_samples: int):
         shape = [num_samples, *input_shape]
-        if max_sequence_length is not None:
-            shape[1] = max_sequence_length
+        shape[1] = self.max_sequence_length
         return shape
 
-    def _get_output_shape(self, mode: str, num_samples: int, max_sequence_length: int = None, **kwargs):
-        return MatlabInputProcessor._make_output_shape(self.loader.input_shape, num_samples, max_sequence_length)
+    @abc.abstractmethod
+    def _get_output_shape(self, num_samples: int, **kwargs):
+        pass
 
-    def _process_sample(self, sample: np.ndarray, sample_idx: int, mode: str, **kwargs) -> np.ndarray:
-        return sample
+    @abc.abstractmethod
+    def _process(self, sample: np.ndarray, other_samples: Dict[str, np.ndarray], **kwargs) -> np.ndarray:
+        pass
 
 
 class SkeletonProcessor(MatlabInputProcessor):
-    def __init__(self):
-        super().__init__("Skeleton", io.SkeletonLoader)
+    def __init__(self, structure: SequenceStructure, mode: Optional[str], max_sequence_length: Optional[int]):
+        super().__init__(structure, mode, max_sequence_length)
+        self.name = "skeleton"
 
-    def _get_output_shape(self, mode: str, num_samples: int, max_sequence_length: int = None, **kwargs):
+    def _get_output_shape(self, num_samples: int, **kwargs):
         # self.loader.input_shape is (num_frames, num_joints[=20], num_channels[=3])
         # shape is (num_samples, num_channels[=3], num_frames, num_joints[=20], num_bodies[=1])
         return [
             num_samples,
-            self.loader.input_shape[-1],
-            max_sequence_length or self.loader.input_shape[0],
-            self.loader.input_shape[1],
+            self.structure.input_shape[-1],
+            self.max_sequence_length,
+            self.structure.input_shape[1],
             1
         ]
 
-    def _process_sample(self, sample: np.ndarray, sample_idx: int, mode: str, **kwargs) -> np.ndarray:
+    def _process(self, sample: np.ndarray, other_samples: Dict[str, np.ndarray], **kwargs) -> np.ndarray:
         # MHAD only has actions were one 'body' is involved: add single dimension for body
         sample = np.expand_dims(sample, axis=0)
         assert skeleton_util.is_valid(sample)
@@ -152,27 +141,27 @@ class SkeletonProcessor(MatlabInputProcessor):
 
 
 class InertialProcessor(MatlabInputProcessor):
-    def __init__(self, **kwargs):
-        super().__init__("Inertial", io.InertialLoader)
-        self.signal_colors = kwargs.get("signal_colors", None)
-        if self.signal_colors is not None:
-            assert len(self.signal_colors) == self.loader.input_shape[-1]
+    def __init__(self, structure: SequenceStructure, mode: Optional[str], max_sequence_length: Optional[int]):
+        super().__init__(structure, mode, max_sequence_length)
+        self.name = "inertial"
 
-    def _get_output_shape(self, mode: str, num_samples: int, max_sequence_length: int = None, **kwargs):
-        if mode == "signal_image":
-            sequence_length = max_sequence_length or self.loader.max_sequence_length
-            input_shape = signal_util.get_signal_image_shape(sequence_length, kwargs.get("signal_image_cutoff", False))
+    def _get_output_shape(self, num_samples: int, **kwargs):
+        if self.mode == "signal_image":
+            # Compute signal image
+            input_shape = signal_util.get_signal_image_shape(self.max_sequence_length,
+                                                             kwargs.get("signal_image_cutoff", False))
             return num_samples, *input_shape
-        elif mode == "signal_image_feature":
+        elif self.mode == "signal_image_feature":
+            # Compute feature vector of signal image using model 'signal_feature_model' (default: resnet18)
             input_shape = signal_util.get_signal_image_feature_shape(kwargs.get("signal_feature_model", None))
-            return MatlabInputProcessor._make_output_shape(input_shape, num_samples, max_sequence_length)
+            return num_samples, *input_shape
 
-        return super()._get_output_shape(mode, num_samples, max_sequence_length)
+        return self._make_simple_output_shape(self.structure.input_shape, num_samples)
 
-    def _process_sample(self, sample: np.ndarray, sample_idx: int, mode: str, **kwargs) -> np.ndarray:
-        if mode == "signal_image":
+    def _process(self, sample: np.ndarray, other_samples: Dict[str, np.ndarray], **kwargs) -> np.ndarray:
+        if self.mode == "signal_image":
             return signal_util.compute_signal_image(sample, kwargs.get("signal_image_cutoff", False))
-        elif mode == "signal_image_feature":
+        elif self.mode == "signal_image_feature":
             return signal_util.compute_signal_image_feature(sample, kwargs.get("signal_feature_model", None))
 
         # No special mode: Just return normalized input signal
@@ -180,24 +169,33 @@ class InertialProcessor(MatlabInputProcessor):
 
 
 class DepthProcessor(MatlabInputProcessor):
-    def __init__(self):
-        super().__init__("Depth", io.DepthLoader)
+    def __init__(self, structure: SequenceStructure, mode: Optional[str], max_sequence_length: Optional[int]):
+        super().__init__(structure, mode, max_sequence_length)
+        self.name = "depth"
 
-    def _process_sample(self, sample: np.ndarray, sample_idx: int, mode: str, **kwargs) -> np.ndarray:
+    def _get_output_shape(self, num_samples: int, **kwargs):
+        return self._make_simple_output_shape(self.structure.input_shape, num_samples)
+
+    def _process(self, sample: np.ndarray, other_samples: Dict[str, np.ndarray], **kwargs) -> np.ndarray:
         return sample
 
 
-class RGBProcessor(Processor):
-    def __init__(self):
-        super().__init__("RGB", io.RGBLoader)
+class RGBVideoProcessor(Processor):
+    def __init__(self, structure: SequenceStructure, mode: Optional[str], max_sequence_length: Optional[int]):
+        super().__init__(structure, mode, max_sequence_length)
+        self.name = "rgb"
 
-    def compute_sequence_lengths(self, files: List[str]) -> np.ndarray:
+    def collect(self, out_path: str, num_samples: int, **kwargs) -> FileWriter:
+        pass
+
+    def compute_sequence_lengths(self, videos: Iterable[cv2.VideoCapture]) -> np.ndarray:
         num_frames = []
-        for video in (cv2.VideoCapture(f) for f in files):
+        for video in videos:
             num_frames.append(int(video.get(cv2.CAP_PROP_FRAME_COUNT)))
-            video.release()
         return np.array(num_frames, dtype=np.int)
 
-    def process(self, out_path: str, samples: Iterable[np.ndarray], num_samples: int, mode: str = None,
-                **kwargs) -> np.ndarray:
-        pass
+    def _process(self, sample: cv2.VideoCapture, other_samples: Dict[str, np.ndarray], **kwargs):
+        if self.mode == "rgb_skeleton_patches":
+            pass
+
+        return sample

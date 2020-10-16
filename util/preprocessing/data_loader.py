@@ -5,6 +5,8 @@ import cv2
 import numpy as np
 from scipy.io import loadmat
 
+import util.preprocessing.video as video_util
+
 
 class SequenceStructure:
     def __init__(self, max_sequence_length: int, input_shape: tuple, target_type: type):
@@ -14,7 +16,8 @@ class SequenceStructure:
 
 
 class Loader:
-    def __init__(self, frame_idx: int, structure: SequenceStructure):
+    def __init__(self, name: str, frame_idx: int, structure: SequenceStructure):
+        self.name = name.lower()
         self.frame_idx = frame_idx
         self.structure = structure
 
@@ -26,10 +29,24 @@ class Loader:
     def load_samples_merged(self, files: Iterable[str]) -> np.ndarray:
         pass
 
+    @abc.abstractmethod
+    def compute_sequence_length(self, sample) -> int:
+        pass
+
+    @abc.abstractmethod
+    def compute_sequence_lengths(self, raw_samples: Iterable[Any]) -> np.ndarray:
+        """
+        Compute length for each sequence in the given list of files.
+
+        :param raw_samples: list of samples from a loader
+        :return: 1D numpy array of size = len(files) that stores the length of each sequence
+        """
+        pass
+
 
 class MatlabLoader(Loader):
-    def __init__(self, mat_id: str, frame_idx: int, structure: SequenceStructure, permutation: tuple):
-        super().__init__(frame_idx, structure)
+    def __init__(self, name: str, mat_id: str, frame_idx: int, structure: SequenceStructure, permutation: tuple):
+        super().__init__(name, frame_idx, structure)
         self._mat_id = mat_id
         self._permutation = permutation
 
@@ -42,6 +59,12 @@ class MatlabLoader(Loader):
         return MatlabLoader.load_all_mat_to_numpy(list(files), self._mat_id, self.frame_idx,
                                                   self.structure.max_sequence_length, self.structure.input_shape,
                                                   self.structure.target_type, self._permutation)
+
+    def compute_sequence_length(self, sample: np.ndarray) -> int:
+        return len(sample)
+
+    def compute_sequence_lengths(self, raw_samples: Iterable[np.ndarray]) -> np.ndarray:
+        return np.array([self.compute_sequence_length(s) for s in raw_samples], dtype=np.int)
 
     @staticmethod
     def load_mat_to_numpy(file_name: str, mat_id: str, frame_dim: int, target_max_sequence_length: int,
@@ -69,12 +92,12 @@ class MatlabLoader(Loader):
 
 
 class RGBVideoLoader(Loader):
-    def __init__(self, structure: SequenceStructure):
-        super().__init__(-1, structure)
+    def __init__(self, name: str, structure: SequenceStructure):
+        super().__init__(name, -1, structure)
 
     def load_samples(self, files: Iterable[str]) -> Iterable[cv2.VideoCapture]:
         for file in files:
-            video = RGBVideoLoader.load_video(file)
+            video = video_util.load_video(file)
             yield video
             video.release()
 
@@ -82,27 +105,11 @@ class RGBVideoLoader(Loader):
         raise RuntimeError("RGBVideoLoader: Merged allocation would require too much memory."
                            "Load and process each video individually instead.")
 
-    @staticmethod
-    def load_video(file_name: str) -> cv2.VideoCapture:
-        return cv2.VideoCapture(file_name)
+    def compute_sequence_length(self, video: cv2.VideoCapture) -> int:
+        return int(video.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    def frames(self, video: cv2.VideoCapture) -> Iterable[np.ndarray]:
-        while video.isOpened():
-            ok, frame = video.read()
-            if not ok:
-                break
-            yield frame.astype(self.structure.target_type)
-
-    def to_numpy(self, video: cv2.VideoCapture) -> np.ndarray:
-        num_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-        w, h = int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-        if w != self.structure.input_shape[1] or h != self.structure.input_shape[0]:
-            video.release()
-            raise ValueError("Video frame dimension does not match input_shape")
-
-        output = np.empty((num_frames, *self.structure.input_shape), dtype=self.structure.target_type)
-        for frame_idx, frame in enumerate(self.frames(video)):
-            output[frame_idx] = frame
-
-        return output
+    def compute_sequence_lengths(self, videos: Iterable[cv2.VideoCapture]) -> np.ndarray:
+        num_frames = []
+        for video in videos:
+            num_frames.append(self.compute_sequence_length(video))
+        return np.array(num_frames, dtype=np.int)

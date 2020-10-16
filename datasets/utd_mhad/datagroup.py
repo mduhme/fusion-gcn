@@ -2,7 +2,7 @@ import copy
 import contextlib
 import os
 from sys import stdout
-from typing import Tuple, List, Dict, Union, Iterable, Optional, Type
+from typing import Tuple, Dict, Union, Iterable, Optional, Sequence, Type
 
 import numpy as np
 import pandas as pd
@@ -16,18 +16,18 @@ from datasets.utd_mhad.processor import Processor
 
 
 class DataGroup:
-    def __init__(self, data: pd.DataFrame, loaders: Dict[str, Loader], processors: Dict[str, Type[Processor]]):
+    def __init__(self, data: pd.DataFrame, loaders: Dict[str, Loader]):
         self.data = data
         self._loaders = loaders
-        self._processors = processors
+        self.default_interpolator_type = NearestNeighborInterpolator
 
     @staticmethod
-    def create(files: List[Tuple[str, List[io.FileMetaData], Loader]], processors: Dict[str, Type[Processor]]):
+    def create(files: Sequence[Tuple[Loader, Sequence[io.FileMetaData]]]):
         assert len(files) > 0, "Must specify at least one modality"
 
-        modalities = [f[0].lower() for f in files]
+        modalities = [f[0].name for f in files]
         modality_files = [f[1] for f in files]
-        loaders = {f[0]: f[2] for f in files}
+        loaders = {f[0].name: f[0] for f in files}
         data_list = []
         num_modalities = len(files)
         num_samples = len(files[0][1])
@@ -50,60 +50,104 @@ class DataGroup:
             data_list.append(metadata)
 
         columns = ["subject", "trial", "action", *modalities]
-        return DataGroup(pd.DataFrame(data_list, columns=columns), loaders, processors)
+        return DataGroup(pd.DataFrame(data_list, columns=columns), loaders)
 
     def _get_interpolators(self,
-                           splits: Dict[str, tuple],
-                           main_modality: Optional[str],
-                           interpolators: Dict[str, Optional[SampleInterpolator]]) -> dict:
+                           loaders: Dict[str, Loader],
+                           interpolators: Dict[str, Optional[SampleInterpolator]]) -> Dict[str, SampleInterpolator]:
         """
-        Return a dictionary of interpolators for each modality and for each split. If main_modality is None,
+        Return a dictionary of interpolators for each modality. If main_modality is None,
         there will be no interpolation and a dictionary filled with None for each key is returned.
 
-        :param splits: Dataset splits (e.g. train, validation) with a tuple of subjects (int) that are part of the set
-        :param main_modality: All other modalities are interpolated so their sequence lengths
-        are equal to the maximum sequence length of this modality.
-        :param interpolators: Dictionary of interpolators for each modality. Will be broadcast for each split.
-        :return: A dictionary with another dictionary of interpolators for each split. In each sub-dictionary,
-        there is an interpolator (or None) for each modality
+        :param loaders: Required loaders
+        :param interpolators: Dictionary of interpolators for each modality.
+        :return: A dictionary of interpolators for each modality
         """
-        if main_modality is None:
-            # No interpolation, fill dictionary with None
-            return {
-                split_name: {k: None for k in self._processors} for split_name in splits
-            }
-
         if interpolators is None:
             interpolators = {}
+        else:
+            interpolators = copy.deepcopy(interpolators)
 
-        output = {}
-        for split_name, split in splits.items():
-            output[split_name] = copy.deepcopy(interpolators)
-            for modality in self._processors:
-                if modality not in output[split_name]:
-                    output[split_name][modality] = NearestNeighborInterpolator()
+        for modality in loaders:
+            if modality not in interpolators or interpolators[modality] is None:
+                interpolators[modality] = self.default_interpolator_type()
 
-        return output
+        return interpolators
 
-    @staticmethod
-    def _process_input_samples(input_samples: Iterable[Dict[str, np.ndarray]],
+    def _setup_processing(self,
+                          main_modality: Optional[str],
+                          processors: Dict[str, Type[Processor]],
+                          modes: Optional[Dict[str, str]],
+                          interpolators: Optional[Dict[str, SampleInterpolator]]) \
+            -> Tuple[Dict[str, Optional[str]],
+                     Optional[int],
+                     Dict[str, Processor],
+                     Dict[str, Loader],
+                     Dict[str, Optional[SampleInterpolator]]]:
+        # Optional 'mode' for each modality: Decides how the modality is processed
+        if modes is None:
+            modes = {k: None for k in processors}
+        else:
+            modes = {k: modes.get(k, None) for k in processors}
+
+        # Maximum sequence length of main modality if specified.
+        # All other modality sequences will be up-/downsampled to this length
+        max_sequence_length = None if main_modality is None else self._loaders[
+            main_modality].structure.max_sequence_length
+
+        # Instantiate processors to process individual samples
+        processors = {k: p(modes[k]) for k, p in processors.items()}
+        requested_loaders = []
+        for proc in processors.values():
+            loaders = proc.get_required_loaders()
+
+            for loader in loaders:
+                if loader not in self._loaders:
+                    raise ValueError(f"The loader '{loader}' does not exist for this DataGroup.")
+
+            input_structure = {loader: self._loaders[loader].structure for loader in loaders}
+            proc.set_input_structure(input_structure, max_sequence_length)
+            requested_loaders.extend(loaders)
+
+        # Only load samples of modalities that are requested by processors
+        requested_loaders = set(requested_loaders)
+        required_loaders = {k: v for k, v in self._loaders.items() if k in requested_loaders}
+
+        # Interpolators for each split and modality to be used for sampling to max_sequence_length
+        interpolators = self._get_interpolators(required_loaders, interpolators)
+        return modes, max_sequence_length, processors, required_loaders, interpolators
+
+    def _process_input_samples(self,
+                               input_samples: Iterable[Dict[str, np.ndarray]],
                                num_samples: int,
+                               main_modality: Optional[str],
                                processors: Dict[str, Processor],
-                               interpolators: Dict[str, Optional[SampleInterpolator]],
+                               interpolators: Dict[str, SampleInterpolator],
                                writers: Optional[Dict[str, FileWriter]]):
         for unprocessed_sample_dict in tqdm(input_samples, "Processing samples", total=num_samples, file=stdout):
-            _ = {
-                processor_name: processor.process(
-                    unprocessed_sample_dict[processor_name],
-                    unprocessed_sample_dict,
-                    interpolators[processor_name],
+            if main_modality is None:
+                for modality, sample in unprocessed_sample_dict.items():
+                    interpolators[modality].target_sequence_length = self._loaders[modality].compute_sequence_length(
+                        sample)
+            else:
+                sequence_length = self._loaders[main_modality].compute_sequence_length(
+                    unprocessed_sample_dict[main_modality])
+                for interpolator in interpolators.values():
+                    interpolator.target_sequence_length = sequence_length
+
+            for processor_name, processor in processors.items():
+                sample = {k: v for k, v in unprocessed_sample_dict.items() if k in processor.get_required_loaders()}
+                sample_lengths = {k: self._loaders[k].compute_sequence_length(v) for k, v in sample.items()}
+                processor.process(
+                    sample,
+                    sample_lengths,
+                    interpolators,
                     writers[processor_name] if writers else None
                 )
-                for processor_name, processor in processors.items()
-            }
 
     def produce_features(self,
                          splits: Dict[str, tuple],
+                         processors: Dict[str, Type[Processor]],
                          main_modality: Optional[str] = None,
                          modes: Optional[Dict[str, str]] = None,
                          out_path: Optional[str] = None,
@@ -113,28 +157,15 @@ class DataGroup:
         there will be no interpolation and a dictionary filled with None for each key is returned.
 
         :param splits: Dataset splits (e.g. train, validation) with a tuple of subjects (int) that are part of the set
+        :param processors: Types of processors that should be used to transform input samples
         :param main_modality: All other modalities are interpolated so their sequence lengths
         are equal to the maximum sequence length of this modality.
         :param modes: A dictionary of modes for each modality
         :param out_path: Path where results will be stored
         that defines the way features of that modality are processed.
         """
-        # Optional 'mode' for each modality: Decides how the modality is processed
-        if modes is None:
-            modes = {k: None for k in self._loaders}
-        else:
-            modes = {k: modes.get(k, None) for k in self._loaders}
-
-        max_sequence_length = None if main_modality is None else self._loaders[
-            main_modality].structure.max_sequence_length
-
-        processors = {
-            k: p(self._loaders[k].structure, modes[k], max_sequence_length)
-            for k, p in self._processors.items()
-        }
-
-        required_loaders = {k: v for k, v in self._loaders.items() if k in processors}
-        interpolators = self._get_interpolators(splits, main_modality, kwargs.get("interpolators", None))
+        modes, max_sequence_length, processors, required_loaders, interpolators = \
+            self._setup_processing(main_modality, processors, modes, kwargs.get("interpolators", None))
 
         # Process all modalities for each split
         for split_name, split in splits.items():
@@ -158,7 +189,8 @@ class DataGroup:
                         for k, p in processors.items()
                     }
 
-                self._process_input_samples(input_samples, num_samples, processors, interpolators[split_name], writers)
+                self._process_input_samples(input_samples, num_samples, main_modality, processors, interpolators,
+                                            writers)
 
     def produce_labels(self, splits: Dict[str, tuple] = None) -> Union[np.ndarray, Dict[str, np.ndarray]]:
         """
@@ -175,13 +207,19 @@ class DataGroup:
 
         return self.data["action"].to_numpy()
 
+    def visualize_sequence(self,
+                           start_frame: int = 0,
+                           end_frame: int = -1,
+                           subject: int = 0,
+                           trial: int = 0,
+                           action: int = 0,
+                           main_modality: Optional[str] = None,
+                           modes: Optional[Dict[str, str]] = None):
+        pass
+
     def compute_stats(self) -> pd.DataFrame:
-        processors = {
-            k: p(self._loaders[k].structure, None, None)
-            for k, p in self._processors.items()
-        }
         df = self.data.copy()
-        samples = {k: self._loaders[k].load_samples(df[k]) for k in processors}
-        sequence_lengths = {f"{k}_length": p.compute_sequence_lengths(samples[k]) for k, p in processors.items()}
+        samples = {k: self._loaders[k].load_samples(df[k]) for k in self._loaders}
+        sequence_lengths = {f"{k}_length": self._loaders[k].compute_sequence_lengths(s) for k, s in samples.items()}
         df = df.assign(**sequence_lengths).drop(columns=self._loaders.keys())
         return df

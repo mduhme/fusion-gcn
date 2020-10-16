@@ -38,7 +38,7 @@ inertial_sequence_structure = SequenceStructure(inertial_max_sequence_length, in
 depth_sequence_structure = SequenceStructure(depth_max_sequence_length, depth_shape, np.uint16)
 rgb_sequence_structure = SequenceStructure(rgb_max_sequence_length, rgb_shape, np.uint8)
 
-skeleton_loader = MatlabLoader("d_skel", skeleton_frame_idx, skeleton_sequence_structure, (2, 0, 1))
-inertial_loader = MatlabLoader("d_iner", inertial_frame_idx, inertial_sequence_structure, (0, 1))
-depth_loader = MatlabLoader("d_depth", depth_frame_idx, depth_sequence_structure, (2, 0, 1))
-rgb_loader = RGBVideoLoader(rgb_sequence_structure)
+skeleton_loader = MatlabLoader("skeleton", "d_skel", skeleton_frame_idx, skeleton_sequence_structure, (2, 0, 1))
+inertial_loader = MatlabLoader("inertial", "d_iner", inertial_frame_idx, inertial_sequence_structure, (0, 1))
+depth_loader = MatlabLoader("depth", "d_depth", depth_frame_idx, depth_sequence_structure, (2, 0, 1))
+rgb_loader = RGBVideoLoader("rgb", rgb_sequence_structure)

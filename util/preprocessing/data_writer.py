@@ -1,14 +1,17 @@
 import abc
+import os
+from typing import Sequence
 
+import cv2
 import numpy as np
 import numpy.lib.format
 
 
 class MemoryMappedArray:
-    def __init__(self, out_path: str, dtype: type, shape: tuple):
+    def __init__(self, out_path: str, dtype: type, shape: Sequence[int]):
         self.out_path = out_path
         self.dtype = dtype
-        self.shape = shape
+        self.shape = tuple(shape)
         self.data = None
 
     def create_file(self):
@@ -48,13 +51,13 @@ class FileWriter:
         pass
 
     @abc.abstractmethod
-    def _collect_next(self, sample: np.ndarray, sample_index: int):
+    def _collect_next(self, sequence, sample_index: int):
         pass
 
-    def collect_next(self, sample: np.ndarray, sample_index: int = None):
+    def collect_next(self, sequence, sample_index: int = None):
         sample_index = sample_index or self.sample_index
-        self._collect_next(sample, sample_index)
-        sample_index += 1
+        self._collect_next(sequence, sample_index)
+        self.sample_index += 1
 
     def __enter__(self):
         self.start_collect()
@@ -65,7 +68,7 @@ class FileWriter:
 
 
 class NumpyWriter(FileWriter):
-    def __init__(self, out_path: str, dtype: type, shape: tuple):
+    def __init__(self, out_path: str, dtype: type, shape: Sequence[int]):
         super().__init__(out_path)
         self._data_store = MemoryMappedArray(out_path, dtype, shape)
 
@@ -75,5 +78,32 @@ class NumpyWriter(FileWriter):
     def end_collect(self):
         self._data_store.close_file()
 
-    def _collect_next(self, sample: np.ndarray, sample_index: int):
-        self._data_store.data[sample_index] = sample
+    def _collect_next(self, sequence: np.ndarray, sample_index: int):
+        self._data_store.data[sample_index] = sequence
+
+
+class VideoWriter(FileWriter):
+    def __init__(self, out_path: str, fps: int, frame_width: int, frame_height: int, create_subdir=True):
+        super().__init__(out_path)
+        self.fps = fps
+        self.frame_width = frame_width
+        self.frame_height = frame_height
+        self.create_subdir = create_subdir
+        self.video_reserve_space = 5
+        self.subdir_filename = "sample"
+
+    def start_collect(self):
+        if self.create_subdir:
+            os.makedirs(self.out_path, exist_ok=True)
+            self.out_path = os.path.join(self.out_path, self.subdir_filename)
+
+    def end_collect(self):
+        pass
+
+    def _collect_next(self, sequence, sample_index: int):
+        writer = cv2.VideoWriter(self.out_path + f".{sample_index + 1:0{self.video_reserve_space}}.avi",
+                                 cv2.VideoWriter_fourcc("M", "J", "P", "G"), self.fps,
+                                 (self.frame_width, self.frame_height))
+        for frame in sequence:
+            writer.write(frame)
+        writer.release()

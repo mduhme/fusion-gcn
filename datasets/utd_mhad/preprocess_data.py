@@ -9,12 +9,10 @@ from datasets.utd_mhad.processor import SkeletonProcessor, InertialProcessor, De
 
 def get_configuration():
     parser = argparse.ArgumentParser(description="UTD-MHAD data conversion.")
-    parser.add_argument("--in_path", default="../unprocessed_data/UTD-MHAD/", type=str,
+    parser.add_argument("-i", "--in_path", default="../unprocessed_data/UTD-MHAD/", type=str,
                         help="UTD-MHAD data parent directory")
-    parser.add_argument("--out_path", default="../preprocessed_data/UTD-MHAD/", type=str,
+    parser.add_argument("-o", "--out_path", default="../preprocessed_data/UTD-MHAD/", type=str,
                         help="Destination directory for processed data.")
-    parser.add_argument("-f", "--force_overwrite", action="store_true",
-                        help="Force preprocessing of data even if it already exists.")
     return parser.parse_args()
 
 
@@ -30,16 +28,11 @@ def preprocess(cf: argparse.Namespace):
     }
 
     multi_modal_data_group = DataGroup.create([
-        ("skeleton", skeleton_data_files, io.skeleton_loader),
-        ("inertial", inertial_data_files, io.inertial_loader),
-        ("depth", depth_data_files, io.depth_loader),
-        ("rgb", rgb_data_files, io.rgb_loader)
-    ], {
-        "skeleton": SkeletonProcessor,
-        "inertial": InertialProcessor,
-        # "depth": DepthProcessor,
-        # "rgb": RGBVideoProcessor
-    })
+        (io.skeleton_loader, skeleton_data_files),
+        (io.inertial_loader, inertial_data_files),
+        (io.depth_loader, depth_data_files),
+        (io.rgb_loader, rgb_data_files)
+    ])
 
     # TODO implement RGB processing (CNN features, Cropped Skeleton-guided CNN features)
     # TODO implement Depth processing
@@ -51,9 +44,15 @@ def preprocess(cf: argparse.Namespace):
         np.save(os.path.join(cf.out_path, f"{split_name}_labels.npy"), labels)
 
     # Create features for each modality and write them to files
-    multi_modal_data_group.produce_features(splits, modes={
-        "inertial": "signal_image_feature",
-        "rgb": "rgb_skeleton_patches"
+    # Mode keys are equivalent to processor keys defined above to set the mode for a specific processor
+    multi_modal_data_group.produce_features(splits, processors={
+        "skeleton": SkeletonProcessor,
+        # "inertial": InertialProcessor,
+        # "depth": DepthProcessor,
+        "rgb": RGBVideoProcessor
+    }, modes={
+        # "inertial": "signal_image_feature",
+        # "rgb": "rgb_skeleton_patches"
     }, out_path=cf.out_path)
 
 

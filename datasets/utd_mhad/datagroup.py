@@ -1,5 +1,6 @@
 import copy
 import contextlib
+import itertools
 import os
 from sys import stdout
 from typing import Tuple, Dict, Union, Iterable, Optional, Sequence, Type
@@ -119,49 +120,52 @@ class DataGroup:
 
     def _process_input_samples(self,
                                input_samples: Iterable[Dict[str, np.ndarray]],
-                               num_samples: int,
                                main_modality: Optional[str],
                                processors: Dict[str, Processor],
                                interpolators: Dict[str, SampleInterpolator],
                                writers: Optional[Dict[str, FileWriter]]):
-        for unprocessed_sample_dict in tqdm(input_samples, "Processing samples", total=num_samples, file=stdout):
+        for unprocessed_sample in input_samples:
             if main_modality is None:
-                for modality, sample in unprocessed_sample_dict.items():
+                for modality, sample in unprocessed_sample.items():
                     interpolators[modality].target_sequence_length = self._loaders[modality].compute_sequence_length(
                         sample)
             else:
                 sequence_length = self._loaders[main_modality].compute_sequence_length(
-                    unprocessed_sample_dict[main_modality])
+                    unprocessed_sample[main_modality])
                 for interpolator in interpolators.values():
                     interpolator.target_sequence_length = sequence_length
 
+            transformed_sample = {}
             for processor_name, processor in processors.items():
-                sample = {k: v for k, v in unprocessed_sample_dict.items() if k in processor.get_required_loaders()}
+                sample = {k: v for k, v in unprocessed_sample.items() if k in processor.get_required_loaders()}
                 sample_lengths = {k: self._loaders[k].compute_sequence_length(v) for k, v in sample.items()}
-                processor.process(
+                res = processor.process(
                     sample,
                     sample_lengths,
                     interpolators,
                     writers[processor_name] if writers else None
                 )
+                transformed_sample[processor_name] = res
+
+            yield unprocessed_sample, transformed_sample
 
     def produce_features(self,
+                         out_path: str,
                          splits: Dict[str, tuple],
                          processors: Dict[str, Type[Processor]],
                          main_modality: Optional[str] = None,
                          modes: Optional[Dict[str, str]] = None,
-                         out_path: Optional[str] = None,
                          **kwargs):
         """
         Produces features for each modality and stores them under the specified path. If main_modality is None,
         there will be no interpolation and a dictionary filled with None for each key is returned.
 
+        :param out_path: Path where results will be stored
         :param splits: Dataset splits (e.g. train, validation) with a tuple of subjects (int) that are part of the set
         :param processors: Types of processors that should be used to transform input samples
         :param main_modality: All other modalities are interpolated so their sequence lengths
         are equal to the maximum sequence length of this modality.
         :param modes: A dictionary of modes for each modality
-        :param out_path: Path where results will be stored
         that defines the way features of that modality are processed.
         """
         modes, max_sequence_length, processors, required_loaders, interpolators = \
@@ -189,8 +193,11 @@ class DataGroup:
                         for k, p in processors.items()
                     }
 
-                self._process_input_samples(input_samples, num_samples, main_modality, processors, interpolators,
-                                            writers)
+                transformed_sample_iter = self._process_input_samples(input_samples, main_modality, processors,
+                                                                      interpolators, writers)
+                for _ in tqdm(transformed_sample_iter, "Processing samples", total=num_samples, file=stdout):
+                    # Do nothing, 'writers' take care of writing to file
+                    pass
 
     def produce_labels(self, splits: Dict[str, tuple] = None) -> Union[np.ndarray, Dict[str, np.ndarray]]:
         """
@@ -208,14 +215,69 @@ class DataGroup:
         return self.data["action"].to_numpy()
 
     def visualize_sequence(self,
+                           processors: Dict[str, Type[Processor]],
+                           args: dict,
                            start_frame: int = 0,
                            end_frame: int = -1,
                            subject: int = 0,
                            trial: int = 0,
                            action: int = 0,
                            main_modality: Optional[str] = None,
-                           modes: Optional[Dict[str, str]] = None):
-        pass
+                           modes: Optional[Dict[str, str]] = None,
+                           **kwargs):
+        row = self.data[(self.data["subject"] == subject) &
+                        (self.data["trial"] == trial) &
+                        (self.data["action"] == action)]
+
+        modes, max_sequence_length, processors, required_loaders, interpolators = \
+            self._setup_processing(main_modality, processors, modes, kwargs.get("interpolators", None))
+
+        # Map modality to a list of files defined by the split
+        files = {k: row[k] for k in required_loaders}
+
+        # Map modality to a generator that loads samples from files
+        input_sample_iter_0 = {k: required_loaders[k].load_samples(files[k]) for k in required_loaders}
+        input_sample_iter_1 = (dict(zip(input_sample_iter_0.keys(), tp)) for tp in zip(*input_sample_iter_0.values()))
+        transformed_sample_iter = self._process_input_samples(input_sample_iter_1, main_modality, processors,
+                                                              interpolators, None)
+        untransformed_sample, transformed_sample = next(itertools.islice(transformed_sample_iter, 1))
+
+        import cv2
+        import matplotlib.pyplot as plt
+        from util.visualization.skeleton import SkeletonVisualizer
+        from util.visualization.visualizer import Controller
+
+        fig: plt.Figure = plt.figure()
+        ax = fig.add_subplot(projection="3d")
+        figure_title = f"unprocessed; subject {subject + 1}; trial {trial + 1}"
+
+        if action_list := args.get("actions", None):
+            action_label = action_list[action]
+            figure_title += f"; action {action + 1} ({action_label})"
+
+        fig.suptitle(figure_title)
+        vis = SkeletonVisualizer()
+        vis.init(ax, untransformed_sample["skeleton"], **args["skeleton"])
+        it = iter(untransformed_sample["skeleton"])
+
+        def _next(event):
+            print("Update plot")
+            print(event)
+            vis.show(ax, next(it))
+
+        controller = Controller(_next)
+        controller.create_at(fig)
+
+        _next(None)
+        plt.show()
+
+        # for frame in untransformed_sample["skeleton"]:
+        #     vis.show(ax, frame)
+        #     plt.show()
+
+        print(row)
+        print(untransformed_sample.keys())
+        print(transformed_sample.keys())
 
     def compute_stats(self) -> pd.DataFrame:
         df = self.data.copy()

@@ -27,33 +27,33 @@ data_shape = (3, skeleton_max_sequence_length, 20, 1)
 
 # 0 = wear inertial sensor on right wrist | 1 = wear inertial sensor on right thigh
 actions = [
-    ("swipe_left", "right arm swipe to the left", 0),  # 0
-    ("swipe_right", "right arm swipe to the right", 0),
-    ("wave", "right hand wave", 0),
-    ("clap", "two hand front clap", 0),
-    ("throw", "right arm throw", 0),
-    ("arm_cross", "cross arms in the chest", 0),  # 5
-    ("basketball_shoot", "basketball shooting", 0),
-    ("draw_x", "draw x", 0),
-    ("draw_circle_CW", "draw circle (clockwise)", 0),
-    ("draw_circle_CCW", "draw circle (counter clockwise)", 0),
-    ("draw_triangle", "draw triangle", 0),  # 10
-    ("bowling", "bowling (right hand)", 0),
-    ("boxing", "front boxing", 0),
-    ("baseball_swing", "baseball swing from right", 0),
-    ("tennis_swing", "tennis forehand swing", 0),
-    ("arm_curl", "arm curl (two arms)", 0),  # 15
-    ("tennis_serve", "tennis serve", 0),
-    ("push", "two hand push", 0),
-    ("knock", "knock on door", 0),
-    ("catch", "hand catch", 0),
-    ("pickup_throw", "pick up and throw", 0),  # 20
-    ("jog", "jogging", 1),
-    ("walk", "walking", 1),
-    ("sit2stand", "sit to stand", 1),
-    ("stand2sit", "stand to sit", 1),
-    ("lunge", "forward lunge (left foot forward)", 1),  # 25
-    ("squat", "squat", 1),
+    "swipe_left",  # 0
+    "swipe_right",
+    "wave",
+    "clap",
+    "throw",
+    "arm_cross",  # 5
+    "basketball_shoot",
+    "draw_x",
+    "draw_circle_CW",
+    "draw_circle_CCW",
+    "draw_triangle",  # 10
+    "bowling",
+    "boxing",
+    "baseball_swing",
+    "tennis_swing",
+    "arm_curl",  # 15
+    "tennis_serve"
+    "push",
+    "knock",
+    "catch",
+    "pickup_throw",  # 20
+    "jog",
+    "walk",
+    "sit2stand",
+    "stand2sit",
+    "lunge",  # 25
+    "squat"
 ]
 
 skeleton_joints = [

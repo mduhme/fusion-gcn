@@ -11,6 +11,7 @@ from util.preprocessing.data_writer import FileWriter, NumpyWriter, VideoWriter
 from util.preprocessing.interpolator import SampleInterpolator
 import util.preprocessing.video as video_util
 import util.preprocessing.sequence as sequence_util
+import util.preprocessing.cnn_features as feature_util
 
 
 class Processor:
@@ -209,6 +210,18 @@ class DepthProcessor(MatlabInputProcessor):
 
 
 class RGBVideoProcessor(Processor):
+    """
+    Class for processing RGB video (cv2.VideoCapture)\n
+    MODES:\n
+    **None**: Return cropped input video\n
+    **rgb_skeleton_patches**: Map skeleton 3D coordinates to 2D image coordinates and extract patches around the
+    projected coordinates which are then transformed with a CNN feature generator\n
+
+    ARGUMENTS:\n
+    **rgb_feature_model**:
+    CNN model for computing feature vectors from images (see cnn_features.py for supported models)
+    """
+
     def __init__(self, mode: Optional[str]):
         super().__init__(mode)
 
@@ -224,7 +237,7 @@ class RGBVideoProcessor(Processor):
             # shape is (num_samples, num_channels[=Output Channels of CNN], num_frames, num_joints[=20], num_bodies[=1])
             shape = [
                 num_samples,
-                1,  # TODO change this
+                feature_util.get_feature_size(kwargs.get("rgb_feature_model", None)),
                 self.max_sequence_length,
                 self.structure["skeleton"].input_shape[1],  # num joints same as skeleton
                 1

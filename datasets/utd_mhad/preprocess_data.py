@@ -5,6 +5,7 @@ import datasets.utd_mhad.io as io
 from datasets.utd_mhad.constants import *
 from datasets.utd_mhad.datagroup import DataGroup
 from datasets.utd_mhad.processor import SkeletonProcessor, InertialProcessor, DepthProcessor, RGBVideoProcessor
+from util.graph import Graph
 
 
 def get_configuration():
@@ -43,17 +44,31 @@ def preprocess(cf: argparse.Namespace):
     for split_name, labels in label_splits.items():
         np.save(os.path.join(cf.out_path, f"{split_name}_labels.npy"), labels)
 
+    multi_modal_data_group.visualize_sequence(processors={
+        "skeleton": SkeletonProcessor,
+        "inertial": InertialProcessor,
+        # "depth": DepthProcessor,
+        # "rgb": RGBVideoProcessor
+    }, args={
+        "skeleton": {
+            "graph": Graph(skeleton_edges),
+            "joints": skeleton_joints
+        },
+        "actions": actions,
+    })
+    exit(0)
+
     # Create features for each modality and write them to files
     # Mode keys are equivalent to processor keys defined above to set the mode for a specific processor
-    multi_modal_data_group.produce_features(splits, processors={
+    multi_modal_data_group.produce_features(cf.out_path, splits, processors={
         "skeleton": SkeletonProcessor,
-        # "inertial": InertialProcessor,
+        "inertial": InertialProcessor,
         # "depth": DepthProcessor,
-        "rgb": RGBVideoProcessor
+        # "rgb": RGBVideoProcessor
     }, modes={
         # "inertial": "signal_image_feature",
         # "rgb": "rgb_skeleton_patches"
-    }, out_path=cf.out_path)
+    })
 
 
 if __name__ == "__main__":

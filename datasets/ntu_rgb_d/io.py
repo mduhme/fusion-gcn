@@ -1,6 +1,7 @@
 import os
 
 from datasets.ntu_rgb_d.constants import *
+from util.preprocessing.skeleton import body_score
 
 
 class SkeletonMetaData:
@@ -88,7 +89,7 @@ class SkeletonSample:
         # Actions always involve either a single person or two people,
         # however, sometimes the detections of kinect sensor are inaccurate and more bodies are detected
         # -> filter only the two most likely bodies
-        scores = np.array([SkeletonSample.body_score(body) for body in self._data])
+        scores = np.array([body_score(body) for body in self._data])
 
         # Sort by score (descending) and get first two indices
         score_mask = scores.argsort()[::-1][:max_body_true]
@@ -107,19 +108,3 @@ class SkeletonSample:
             self._filter_bodies()
 
         return self._data
-
-    @staticmethod
-    def body_score(body_data: np.ndarray):
-        """
-        From 'Skeleton-Based Action Recognition with Multi-Stream Adaptive Graph Convolutional Networks':
-        The body tracker of Kinect is prone to detecting more than 2 bodies, some of which are objects.
-        To filter the incorrect bodies, we first select two bodies in each sample based on the body energy.
-        The energy is defined as the average of the skeleton’s standard deviation across each of the channels.
-        :param body_data: array of shape (NumFrames, NumJoints, 3 (XYZ-Coordinates))
-        """
-        # Sum over joints and coordinates, create a mask for all values (NumFrames) that are not zero.
-        valid_frame_mask = body_data.sum(-1).sum(-1) != 0
-        body_data = body_data[valid_frame_mask]
-        if len(body_data) != 0:
-            return sum(body_data[:, :, i].std() for i in range(body_data.shape[-1]))
-        return 0

@@ -13,7 +13,7 @@ import datasets.utd_mhad.io as io
 from util.preprocessing.interpolator import SampleInterpolator, NearestNeighborInterpolator
 from util.preprocessing.data_writer import FileWriter
 from util.preprocessing.data_loader import Loader
-from datasets.utd_mhad.processor import Processor
+from util.preprocessing.processor.base import Processor
 
 
 class DataGroup:
@@ -123,17 +123,14 @@ class DataGroup:
                                main_modality: Optional[str],
                                processors: Dict[str, Processor],
                                interpolators: Dict[str, SampleInterpolator],
-                               writers: Optional[Dict[str, FileWriter]]):
+                               writers: Optional[Dict[str, FileWriter]],
+                               **kwargs):
         for unprocessed_sample in input_samples:
-            if main_modality is None:
-                for modality, sample in unprocessed_sample.items():
-                    interpolators[modality].target_sequence_length = self._loaders[modality].compute_sequence_length(
-                        sample)
-            else:
+            if main_modality is not None:
                 sequence_length = self._loaders[main_modality].compute_sequence_length(
                     unprocessed_sample[main_modality])
                 for interpolator in interpolators.values():
-                    interpolator.target_sequence_length = sequence_length
+                    interpolator.global_target_sequence_length = sequence_length
 
             transformed_sample = {}
             for processor_name, processor in processors.items():
@@ -143,7 +140,8 @@ class DataGroup:
                     sample,
                     sample_lengths,
                     interpolators,
-                    writers[processor_name] if writers else None
+                    writers[processor_name] if writers else None,
+                    **kwargs
                 )
                 transformed_sample[processor_name] = res
 
@@ -171,6 +169,9 @@ class DataGroup:
         modes, max_sequence_length, processors, required_loaders, interpolators = \
             self._setup_processing(main_modality, processors, modes, kwargs.get("interpolators", None))
 
+        print("START PREPROCESSING")
+        print("Modes:", ", ".join(f"{k}: {v}" for k, v in modes.items() if v))
+
         # Process all modalities for each split
         for split_name, split in splits.items():
             print(f"Split '{split_name}' - Modalities: {', '.join(processors.keys())}")
@@ -189,12 +190,12 @@ class DataGroup:
                 if out_path:
                     out_paths = {k: os.path.join(out_path, f"{k.lower()}_{split_name}_features") for k in processors}
                     writers = {
-                        k: stack.enter_context(p.collect(out_paths[k], num_samples))
+                        k: stack.enter_context(p.collect(out_paths[k], num_samples, **kwargs))
                         for k, p in processors.items()
                     }
 
                 transformed_sample_iter = self._process_input_samples(input_samples, main_modality, processors,
-                                                                      interpolators, writers)
+                                                                      interpolators, writers, **kwargs)
                 for _ in tqdm(transformed_sample_iter, "Processing samples", total=num_samples, file=stdout):
                     # Do nothing, 'writers' take care of writing to file
                     pass

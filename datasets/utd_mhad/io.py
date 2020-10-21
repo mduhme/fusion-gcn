@@ -30,7 +30,7 @@ def parse_file_name(file_name: str):
 
 def get_files(data_path: str):
     files = [os.path.join(data_path, file.name) for file in os.scandir(data_path) if file.is_file()]
-    return [parse_file_name(fn) for fn in files if os.path.splitext(fn)[1] in (".mat", ".avi")]
+    return [parse_file_name(fn) for fn in files if os.path.splitext(fn)[1] in (".mat", ".avi", ".npy")]
 
 
 skeleton_sequence_structure = SequenceStructure(skeleton_max_sequence_length, skeleton_shape, np.float32)

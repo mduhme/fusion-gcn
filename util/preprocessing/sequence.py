@@ -16,5 +16,5 @@ def pad_sequence_generator(sequence: Iterable[Any], max_sequence_length: int) ->
     for index, element in enumerate(sequence):
         yield element
 
-    for _ in range(index, max_sequence_length):
+    for _ in range(index + 1, max_sequence_length):
         yield np.zeros_like(element)

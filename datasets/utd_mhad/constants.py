@@ -111,13 +111,15 @@ file_matcher = re.compile(r"a(\d+)_s(\d+)_t(\d+)_\S+")
 
 # KINECT CALIBRATION DATA from
 # Kinect 1 SDK -> NuiImageCamera.h
+# or https://github.com/neilmendoza/ofxKinectSdk/blob/master/libs/kinect/include/NuiImageCamera.h
 # http://burrus.name/index.php/Research/KinectCalibration
 
-rgb_dim = np.array([640, 480], dtype=np.int)
-depth_dim = np.array([320, 240], dtype=np.int)
+rgb_dim = (640, 480)
+depth_dim = (320, 240)
 
-f_color = 531.15
-f_depth = 285.63
+f_rgb = (5.2921508098293293e+02, 5.2556393630057437e+02)
+# f_color = 531.15
+f_depth = (285.63, 285.63)
 
 R = np.array([
     [9.9984628826577793e-01, 1.2635359098409581e-03, -1.7487233004436643e-02],
@@ -126,4 +128,4 @@ R = np.array([
 ])
 T = np.array([1.9985242312092553e-02, -7.4423738761617583e-04, -1.0916736334336222e-02]) * 2
 
-skeleton_patch_extractor = SkeletonPatchExtractor(f_color, f_depth, T, R, rgb_dim, depth_dim)
+skeleton_patch_extractor = SkeletonPatchExtractor(f_rgb, f_depth, T, R, rgb_dim, depth_dim)

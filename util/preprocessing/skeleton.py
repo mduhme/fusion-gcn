@@ -160,3 +160,19 @@ def normalize_skeleton_data(skeleton_data: np.ndarray, origin_joint: int, z_axis
 
     # parallelize left (4) and right (8) shoulder joints of first person with x-axis
     multi_parallelize_joints_to_axis(skeleton_data, x_axis_joints, (1, 0, 0))
+
+
+def body_score(body_data: np.ndarray) -> float:
+    """
+    From 'Skeleton-Based Action Recognition with Multi-Stream Adaptive Graph Convolutional Networks':
+    The body tracker of Kinect is prone to detecting more than 2 bodies, some of which are objects.
+    To filter the incorrect bodies, we first select two bodies in each sample based on the body energy.
+    The energy is defined as the average of the skeleton’s standard deviation across each of the channels.
+    :param body_data: array of shape (NumFrames, NumJoints, 3 (XYZ-Coordinates))
+    """
+    # Sum over joints and coordinates, create a mask for all values (NumFrames) that are not zero.
+    valid_frame_mask = body_data.sum(-1).sum(-1) != 0
+    body_data = body_data[valid_frame_mask]
+    if len(body_data) != 0:
+        return sum(body_data[:, :, i].std() for i in range(body_data.shape[-1]))
+    return 0

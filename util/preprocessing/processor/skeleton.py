@@ -44,7 +44,7 @@ class SkeletonProcessor(MatlabInputProcessor):
             skeleton = np.expand_dims(skeleton, axis=0)
         assert skeleton_util.is_valid(skeleton)
 
-        # TODO generalize this
+        # TODO generalize this, only works for UTD-MHAD for now
         skeleton = skeleton_util.normalize_skeleton(skeleton, 2, (3, 2), (4, 8))
         # Permute from (num_bodies, num_frames, num_joints, num_channels)
         # to (num_channels, num_frames, num_joints, num_bodies)

@@ -131,12 +131,13 @@ class TCN_GCN_unit(nn.Module):
         return self.relu(x)
 
 
+# noinspection PyAbstractClass
 class Model(nn.Module):
     def __init__(self, data_shape, num_classes, graph):
         super(Model, self).__init__()
 
         # data_shape = (num_channels, num_frames, num_joints, num_persons)
-        num_channels, _, num_joints, num_persons = data_shape
+        num_channels, _, num_joints, num_persons = data_shape["skeleton"]
 
         strategy = GraphPartitionStrategy()
         A = strategy.get_adjacency_matrix_array(graph)

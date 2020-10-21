@@ -6,7 +6,7 @@ training_cameras = (2, 3)
 max_body_true = 2
 max_body_kinect = 4
 max_sequence_length = 300
-data_shape = (3, 300, 25, 2)
+default_data_shape = (3, 300, 25, 2)
 
 actions = [
     # daily actions
@@ -131,6 +131,7 @@ skeleton_edges = np.array([
     (23, 24),
     (24, 11)
 ])
+center_joint = 20
 
 num_joints = len(skeleton_joints)
 num_classes = len(actions)

@@ -103,7 +103,7 @@ class Model(nn.Module):
         super(Model, self).__init__()
 
         # data_shape = (num_channels, num_frames, num_joints, num_persons)
-        num_channels, _, num_joints, num_persons = data_shape
+        num_channels, _, num_joints, num_persons = data_shape["skeleton"]
         num_gcn_scales = kwargs.get("num_gcn_scales", 13)
         num_g3d_scales = kwargs.get("num_g3d_scales", 6)
 

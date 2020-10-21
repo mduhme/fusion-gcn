@@ -23,7 +23,7 @@ inertial_shape = (inertial_max_sequence_length, 6)  # 3x acceleration + 3x rotat
 rgb_shape = (rgb_max_sequence_length, 480, 640, 3)
 depth_shape = (depth_max_sequence_length, 240, 320)
 
-data_shape = (3, skeleton_max_sequence_length, 20, 1)
+default_data_shape = (3, skeleton_max_sequence_length, 20, 1)
 
 # 0 = wear inertial sensor on right wrist | 1 = wear inertial sensor on right thigh
 actions = [
@@ -43,7 +43,7 @@ actions = [
     "baseball_swing",
     "tennis_swing",
     "arm_curl",  # 15
-    "tennis_serve"
+    "tennis_serve",
     "push",
     "knock",
     "catch",
@@ -101,6 +101,7 @@ skeleton_edges = np.array([
     (18, 17),
     (19, 18)
 ])
+center_joint = 1
 
 num_joints = len(skeleton_joints)
 num_classes = len(actions)

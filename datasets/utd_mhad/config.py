@@ -36,13 +36,31 @@ settings = {
             }
         },
 
+        # Mode skele+imu:
+        # Combine skeleton and IMU data (extend skeleton by 2 joints -> Acc xyz and Gyro xyz
+        "skele+imu": {
+            "processors": {
+                "skeleton": "skeleton.SkeletonProcessor",
+            },
+            "modes": {
+                "skeleton": "skele+imu",
+            }
+        },
+
         # Default processing for all modalities
-        None: {
+        "all_default": {
             "processors": {
                 "skeleton": "skeleton.SkeletonProcessor",
                 "inertial": "inertial.InertialProcessor",
                 "depth": "depth.DepthProcessor",
                 "rgb": "rgb.RGBVideoProcessor"
+            }
+        },
+
+        # Only default skeleton processing
+        None: {
+            "processors": {
+                "skeleton": "skeleton.SkeletonProcessor"
             }
         }
     }

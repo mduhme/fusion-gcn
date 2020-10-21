@@ -1,0 +1,26 @@
+# Configuration with same parameters as in AGCN paper/code (except batch size)
+
+in_path: ..\preprocessed_data\UTD-MHAD\default
+out_path: ..\models\agcn\UTD-MHAD
+model: agcn
+dataset: UTD-MHAD
+session_type: training
+loader: loader.SkeletonDataset
+fixed_seed: 1
+
+base_lr: 0.1
+optimizer: SGD
+optimizer_args:
+  momentum: 0.9
+  nesterov: true
+  weight_decay: 0.0001
+
+lr_scheduler: multistep
+lr_scheduler_args:
+  milestones:
+    - 30
+    - 40
+  gamma: 0.1
+
+batch_size: 8
+epochs: 50

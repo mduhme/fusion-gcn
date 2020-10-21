@@ -4,6 +4,8 @@ import os
 
 import yaml
 
+from util.dynamic_import import import_class
+
 model_args_defaults = {
     "epochs": 50,
     "batch_size": 16,
@@ -55,6 +57,7 @@ def get_configuration(session_types: tuple, optimizer_choices: tuple,
                         help="Specify which dataset constants to load from the 'datasets' subdirectory.")
     parser.add_argument("-s", "--session_type", type=str, choices=session_types,
                         help="Session type: Training or Evaluation.")
+    parser.add_argument("-l", "--loader", type=str, help="Which loader to use to read the dataset.")
     parser.add_argument("--in_path", type=str, help="Path to data sets for training/validation")
     parser.add_argument("--out_path", type=str,
                         help="Path where trained models temporary results / checkpoints will be stored")
@@ -85,7 +88,7 @@ def get_configuration(session_types: tuple, optimizer_choices: tuple,
         load_and_merge_configuration(config, config.file)
 
     # Raise an error if any of the required arguments aren't provided
-    required_args = ["in_path", "out_path", "model", "dataset", "session_type"]
+    required_args = ["in_path", "out_path", "model", "dataset", "session_type", "loader"]
     if not all(hasattr(config, attr) for attr in required_args):
         raise LookupError("The following arguments are required: " + ", ".join(required_args))
 
@@ -118,15 +121,14 @@ def get_configuration(session_types: tuple, optimizer_choices: tuple,
     config.in_path = os.path.abspath(config.in_path)
     config.out_path = os.path.abspath(config.out_path)
 
-    # Add path to training/validation sets to config
-    if not hasattr(config, "training_features_path"):
-        setattr(config, "training_features_path", os.path.join(config.in_path, "train_features.npy"))
-    if not hasattr(config, "training_labels_path"):
-        setattr(config, "training_labels_path", os.path.join(config.in_path, "train_labels.npy"))
-    if not hasattr(config, "validation_features_path"):
-        setattr(config, "validation_features_path", os.path.join(config.in_path, "val_features.npy"))
-    if not hasattr(config, "validation_labels_path"):
-        setattr(config, "validation_labels_path", os.path.join(config.in_path, "val_labels.npy"))
+    # Load Dataset handler
+    setattr(config, "loader_type", import_class(config.loader))
+
+    if not hasattr(config, "mode"):
+        setattr(config, "mode", None)
+
+    if not hasattr(config, "model_args"):
+        setattr(config, "model_args", {})
 
     # Create output path if it does not exist
     if not os.path.exists(config.out_path):

@@ -1,10 +1,14 @@
-in_path: ..\preprocessed_data\UTD-MHAD\default
+# Configuration using Skeleton+IMU data combined and extracted and computed RGB patch features
+
+in_path: ..\preprocessed_data\UTD-MHAD\skele+imu
 out_path: ..\models\agcn\UTD-MHAD
-model: agcn
+model: mmagcn
 dataset: UTD-MHAD
 session_type: training
 loader: loader.SkeletonDataset
 fixed_seed: 1
+
+mode: skele+imu
 
 base_lr: 0.001
 optimizer: ADAM

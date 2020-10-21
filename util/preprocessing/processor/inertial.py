@@ -2,7 +2,7 @@ from typing import Dict, Optional, Sequence
 
 import numpy as np
 
-import util.preprocessing.imu as signal_util
+import util.preprocessing.signal as signal_util
 from util.preprocessing.interpolator import SampleInterpolator
 from util.preprocessing.processor.base import MatlabInputProcessor
 

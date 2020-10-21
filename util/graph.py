@@ -8,7 +8,7 @@ class Graph:
     Simple class to store a graph.
     """
 
-    def __init__(self, edges, num_vertices=None, is_directed=False):
+    def __init__(self, edges, num_vertices=None, is_directed=False, center_joint=0):
         self.edges = np.unique(edges, axis=0)
         assert np.issubdtype(self.edges.dtype, np.integer)
         assert np.all(self.edges >= 0)
@@ -23,20 +23,21 @@ class Graph:
         self.__a = None  # adjacency matrix
         self.__d = None  # degree matrix
         self.is_directed = is_directed
+        self.center_joint = center_joint
 
     def as_directed(self):
         if self.is_directed:
             return self
-        return Graph(self.edges, self.num_vertices, True)
+        return Graph(self.edges, self.num_vertices, True, self.center_joint)
 
     def as_undirected(self):
         if not self.is_directed:
             return self
-        return Graph(self.edges, self.num_vertices, False)
+        return Graph(self.edges, self.num_vertices, False, self.center_joint)
 
     def with_reversed_edges(self):
         reversed_edges = [(j, i) for i, j in self.edges]
-        return Graph(reversed_edges, self.num_vertices, self.is_directed)
+        return Graph(reversed_edges, self.num_vertices, self.is_directed, self.center_joint)
 
     def has_edge(self, edge):
         assert len(edge) == 2
@@ -62,14 +63,14 @@ class Graph:
         assert np.issubdtype(edges.dtype, np.integer)
         assert np.all(edges >= 0)
         assert edges.shape[1] == 2
-        return Graph(np.vstack((self.edges, edges)))
+        return Graph(np.vstack((self.edges, edges)), center_joint=self.center_joint)
 
     def with_removed_edges(self, edges):
         edges = np.array(edges)
         assert np.issubdtype(edges.dtype, np.integer)
         assert np.all(edges >= 0)
         assert edges.shape[1] == 2
-        return Graph(np.delete(self.edges, np.where(self.__is_one_of(edges)), axis=0))
+        return Graph(np.delete(self.edges, np.where(self.__is_one_of(edges)), axis=0), center_joint=self.center_joint)
 
     def get_adjacency_matrix(self):
         if self.__a is None:

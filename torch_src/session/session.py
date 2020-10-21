@@ -40,7 +40,7 @@ class Session:
         self.disable_logging = self._base_config.disable_logging
         self.disable_checkpointing = self._base_config.disable_checkpointing
 
-    def _build_model(self, config: dict) -> tuple:
+    def _build_model(self, config: dict, data_shape: tuple, num_classes: int) -> tuple:
         """
         Build the network model, optimizer, loss function and learning rate scheduler given the.
 
@@ -48,15 +48,18 @@ class Session:
         :return: tuple (model, loss function, optimizer, learning rate scheduler)
         """
 
-        skeleton_edges, data_shape, num_classes = import_dataset_constants(self._base_config.dataset, [
-            "skeleton_edges", "data_shape", "num_classes"
-        ])
+        skeleton_edges, center_joint = import_dataset_constants(self._base_config.dataset,
+                                                                ["skeleton_edges", "center_joint"])
 
-        graph = Graph(skeleton_edges)
+        graph = Graph(skeleton_edges, center_joint=center_joint)
         # https://pytorch.org/docs/stable/generated/torch.nn.Module.html
         # noinspection PyPep8Naming
         Model = import_model(self._base_config.model)
-        model = Model(data_shape, num_classes, graph).cuda()
+        model = Model(data_shape, num_classes, graph, mode=self._base_config.mode,
+                      **self._base_config.model_args).cuda()
+        # import torch.nn as nn
+        # l = [module for module in model.modules() if type(module) != nn.Sequential]
+        # print(l)
         loss_function = torch.nn.CrossEntropyLoss().cuda()
         optimizer = session_helper.create_optimizer(config["optimizer"], model, config["base_lr"],
                                                     **config["optimizer_args"])
@@ -158,7 +161,10 @@ class Session:
 
         for features_batch, label_batch, indices in dataset:
             with torch.no_grad():
-                features = features_batch.float().cuda()
+                if type(features_batch) is list:
+                    features = list(map(lambda x: x.float().cuda(), features_batch))
+                else:
+                    features = features_batch.float().cuda()
                 label = label_batch.long().cuda()
 
             # Clear gradients for each parameter
@@ -180,7 +186,10 @@ class Session:
         model.eval()
         with torch.no_grad():
             for features_batch, label_batch, indices in dataset:
-                features = features_batch.float().cuda()
+                if type(features_batch) is list:
+                    features = list(map(lambda x: x.float().cuda(), features_batch))
+                else:
+                    features = features_batch.float().cuda()
                 label = label_batch.long().cuda()
                 batch_processor.process_single_batch(model, loss_function, features, label,
                                                      metrics.update_validation)

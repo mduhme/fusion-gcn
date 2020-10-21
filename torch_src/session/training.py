@@ -5,7 +5,6 @@ from torch.utils.data import DataLoader
 import session_helper
 import torch_util
 from config import fill_model_config
-from data_input import SkeletonDataset
 from progress import ProgressLogger, CheckpointManager
 from session.procedures.batch_train import BatchProcessor, get_batch_processor_from_config
 from session.session import Session
@@ -19,14 +18,11 @@ class TrainingSession(Session):
         shuffle = not self._base_config.disable_shuffle
         worker_init_fn = torch_util.set_seed if self._base_config.fixed_seed is not None else None
         training_data = DataLoader(
-            SkeletonDataset(self._base_config.training_features_path, self._base_config.training_labels_path,
-                            in_memory=self._base_config.in_memory),
-            batch_size, shuffle=shuffle, drop_last=True,
-            worker_init_fn=worker_init_fn)
+            self._base_config.loader_type(self._base_config.in_path, "train", in_memory=self._base_config.in_memory),
+            batch_size, shuffle=shuffle, drop_last=True, worker_init_fn=worker_init_fn)
 
-        validation_data = DataLoader(
-            SkeletonDataset(self._base_config.validation_features_path, self._base_config.validation_labels_path),
-            test_batch_size, shuffle=False, drop_last=False, worker_init_fn=worker_init_fn)
+        validation_data = DataLoader(self._base_config.loader_type(self._base_config.in_path, "val"),
+                                     test_batch_size, shuffle=False, drop_last=False, worker_init_fn=worker_init_fn)
         return training_data, validation_data
 
     def _build_logging(self, batch_processor: BatchProcessor, epochs: int, training_data_size: int,
@@ -71,8 +67,13 @@ class TrainingSession(Session):
                                                          config.get("test_batch_size",
                                                                     self._base_config.test_batch_size))
 
+        # noinspection PyUnresolvedReferences
+        data_shape = training_data.dataset.get_input_shape()
+        # noinspection PyUnresolvedReferences
+        num_classes = training_data.dataset.get_num_classes()
+
         config = session_helper.prepare_learning_rate_scheduler_args(config, epochs, len(training_data))
-        model, loss_function, optimizer, lr_scheduler = self._build_model(config)
+        model, loss_function, optimizer, lr_scheduler = self._build_model(config, data_shape, num_classes)
         progress, cp_manager = self._build_logging(batch_processor, epochs, len(training_data),
                                                    len(validation_data), state_dict_objects={
                 "model": model,

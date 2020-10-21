@@ -21,7 +21,8 @@ class ProfilingSession(Session):
 
         num_batches = self._base_config.profiling_batches
         batch_size = config.get("batch_size", self._base_config.batch_size)
-        data_shape, num_classes = import_dataset_constants(self._base_config.dataset, ["data_shape", "num_classes"])
+        data_shape, num_classes = import_dataset_constants(self._base_config.dataset,
+                                                           ["default_data_shape", "num_classes"])
         model, loss_function, optimizer, lr_scheduler = self._build_model(config)
 
         features_shape = (num_batches, batch_size, *data_shape)

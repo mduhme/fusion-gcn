@@ -6,14 +6,22 @@ As of creation of this file (07.10.2020), Python 3.8+ is not working with compil
 
 import os
 import sys
-from typing import Union, Sequence
+from typing import Union, Sequence, Optional
 
 import cv2
 import numpy as np
 
 
 class OpenPose:
-    def __init__(self, bin_path: str, python_path: str):
+    def __init__(self, bin_path: str, python_path: str, model_pose: str = "COCO",
+                 default_params: Optional[dict] = None):
+        """
+        :param bin_path: path to openpose binary files
+        :param python_path: path to openpose python files
+        :param model_pose: which pose model to use
+        :param default_params: Configuration options like:
+        https://gist.github.com/asus4/f3b6e50469d3295a42795f0921c9688d
+        """
         bin_path = os.path.abspath(bin_path)
         python_path = os.path.abspath(python_path)
 
@@ -28,9 +36,13 @@ class OpenPose:
         self._add_path()
         self._backend = OpenPose._import_backend()
         self._wrapper = self._backend.WrapperPython()
-        self.default_params = {
-            "model_folder": self.model_path
-        }
+        self._default_params = {}
+        if default_params is not None:
+            self._default_params.update(default_params)
+        self._default_params.update({
+            "model_folder": self.model_path,
+            "model_pose": model_pose
+        })
 
     def configure(self, params: dict):
         self._wrapper.stop()
@@ -67,7 +79,7 @@ class OpenPose:
         return output
 
     def __enter__(self):
-        self.configure(self.default_params)
+        self.configure(self._default_params)
         self._wrapper.start()
         return self
 
@@ -90,3 +102,14 @@ class OpenPose:
             sys.path.append(self.python_path)
         if self.binary_path not in os.environ["PATH"]:
             os.environ["PATH"] += os.pathsep + self.binary_path
+
+
+def body_score(body: np.ndarray) -> float:
+    """
+    Return the body score which is the sum of all joint probabilities
+
+    :param body: body of shape (num joints, 3)
+    :return: body score
+    """
+
+    return float(np.sum(body[..., -1]))

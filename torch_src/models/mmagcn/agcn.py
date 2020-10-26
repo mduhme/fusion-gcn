@@ -8,14 +8,6 @@ from torch.autograd import Variable
 from util.partition_strategy import GraphPartitionStrategy
 
 
-def import_class(name):
-    components = name.split(".")
-    mod = __import__(components[0])
-    for comp in components[1:]:
-        mod = getattr(mod, comp)
-    return mod
-
-
 def conv_branch_init(conv, branches):
     weight = conv.weight
     n = weight.size(0)

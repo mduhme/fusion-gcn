@@ -10,12 +10,16 @@ fixed_seed: 1
 
 mode: skele+imu__rgb_patches_op
 
-base_lr: 0.001
-optimizer: ADAM
+base_lr: 0.0005
+optimizer: SGD
 optimizer_args:
+  momentum: 0.9
+  nesterov: true
   weight_decay: 0.01
 
-lr_scheduler: ca
+lr_scheduler: exp
+lr_scheduler_args:
+  gamma: 0.95
 
 batch_size: 8
 epochs: 50

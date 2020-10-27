@@ -2,69 +2,35 @@ from datasets.utd_mhad.constants import *
 
 
 settings = {
-        # Mode skele+imu__rgb_patches_op:
+        # Mode skeleton_imu_enhanced:
         # Combine skeleton and IMU data (extend skeleton by 2 joints -> Acc xyz and Gyro xyz
-        # Use Openpose skeletons to extract RGB patches and convert them to features using Resnet18
-        "skele+imu__rgb_patches_op": {
+        "skeleton_imu_enhanced": {
             "processors": {
                 "skeleton": "skeleton.SkeletonProcessor",
+            },
+            "modes": {
+                "skeleton": "imu_enhanced",
+            }
+        },
+
+        "rgb_patch_features_op": {
+            "processors": {
                 "rgb": "rgb.RGBVideoProcessor"
             },
             "modes": {
-                "skeleton": "skele+imu",
-                "rgb": "rgb_openpose_skeleton_patches"
+                "rgb": "rgb_openpose_skeleton_patch_features"
             },
             "kwargs": {
                 "skeleton_patch_extractor": skeleton_patch_extractor
             }
         },
 
-        # Mode skele+imu__rgb_patches:
-        # Combine skeleton and IMU data (extend skeleton by 2 joints -> Acc xyz and Gyro xyz
-        # Project skeleton to RGB images, extract patches and convert them to features using Resnet18
-        "skele+imu__rgb_patches": {
-            "processors": {
-                "skeleton": "skeleton.SkeletonProcessor",
-                "rgb": "rgb.RGBVideoProcessor"
-            },
-            "modes": {
-                "skeleton": "skele+imu",
-                "rgb": "rgb_skeleton_patches"
-            },
-            "kwargs": {
-                "skeleton_patch_extractor": skeleton_patch_extractor
-            }
-        },
-
-        # Mode skele+imu:
-        # Combine skeleton and IMU data (extend skeleton by 2 joints -> Acc xyz and Gyro xyz
-        "skele+imu": {
-            "processors": {
-                "skeleton": "skeleton.SkeletonProcessor",
-            },
-            "modes": {
-                "skeleton": "skele+imu",
-            }
-        },
-
-        "rgb_patches_op": {
+        "rgb_group_patch_features_op": {
             "processors": {
                 "rgb": "rgb.RGBVideoProcessor"
             },
             "modes": {
-                "rgb": "rgb_openpose_skeleton_patches"
-            },
-            "kwargs": {
-                "skeleton_patch_extractor": skeleton_patch_extractor
-            }
-        },
-
-        "rgb_patches_op_groups": {
-            "processors": {
-                "rgb": "rgb.RGBVideoProcessor"
-            },
-            "modes": {
-                "rgb": "rgb_openpose_skeleton_patches"
+                "rgb": "rgb_openpose_skeleton_patch_features"
             },
             "kwargs": {
                 "skeleton_patch_extractor": skeleton_patch_extractor,
@@ -79,18 +45,37 @@ settings = {
             }
         },
 
-        "rgb_patches": {
+        "rgb_patch_features": {
             "processors": {
                 "rgb": "rgb.RGBVideoProcessor"
             },
             "modes": {
-                "rgb": "rgb_skeleton_patches"
+                "rgb": "rgb_skeleton_patch_features"
             },
             "kwargs": {
                 "skeleton_patch_extractor": skeleton_patch_extractor
             }
         },
 
+        "rgb_group_patch_features": {
+            "processors": {
+                "rgb": "rgb.RGBVideoProcessor"
+            },
+            "modes": {
+                "rgb": "rgb_skeleton_patch_features"
+            },
+            "kwargs": {
+                "skeleton_patch_extractor": skeleton_patch_extractor,
+                "op_joint_groups": [  # grouped openpose skeleton joints
+                    (),  # head and torso
+                    (),  # left arm
+                    (),  # right arm
+                    (),  # left leg
+                    (),  # right leg
+                ],
+                "joint_groups_patch_offset": 16
+            }
+        },
 
         "rgb_default": {
             "processors": {
@@ -111,6 +96,18 @@ settings = {
             }
         },
 
+        "skeleton_default": {
+            "processors": {
+                "skeleton": "skeleton.SkeletonProcessor"
+            }
+        },
+
+        "imu_default": {
+            "processors": {
+                "inertial": "inertial.InertialProcessor"
+            }
+        },
+
         # extract 2D bounding boxes from openpose skeletons
         "op_bb": {
             "processors": {
@@ -120,13 +117,6 @@ settings = {
                 "skeleton": "op_bb"
             }
         },
-
-        # Only default skeleton processing
-        None: {
-            "processors": {
-                "skeleton": "skeleton.SkeletonProcessor"
-            }
-        }
     }
 
 

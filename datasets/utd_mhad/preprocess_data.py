@@ -6,6 +6,7 @@ from datasets.utd_mhad.config import get_preprocessing_setting
 from datasets.utd_mhad.constants import *
 from datasets.utd_mhad.datagroup import DataGroup
 from util.dynamic_import import import_class
+from util.merge import deep_merge_dictionary
 from util.preprocessing.data_loader import OpenposeBody25ToKinect1Loader, SequenceStructure
 
 
@@ -15,8 +16,8 @@ def get_configuration() -> argparse.Namespace:
                         help="UTD-MHAD data parent directory")
     parser.add_argument("-o", "--out_path", default="../preprocessed_data/UTD-MHAD/", type=str,
                         help="Destination directory for processed data.")
-    parser.add_argument("--mode", type=str, help="Mode to decide how to process the dataset."
-                                                 " See preprocess_data.py:get_preprocessing_setting")
+    parser.add_argument("--modes", type=str, help="Modes (comma-separated) to decide how to process the dataset."
+                                                  " See preprocess_data.py:get_preprocessing_setting")
     parser.add_argument("--debug", action="store_true", help="debug mode")
     return parser.parse_args()
 
@@ -73,7 +74,8 @@ def preprocess(cf: argparse.Namespace):
         "val": test_subjects
     }
 
-    setting = get_preprocessing_setting(cf.mode)
+    modes = ["skeleton_default"] if cf.modes is None else cf.modes.split(",")
+    setting = deep_merge_dictionary((get_preprocessing_setting(mode) for mode in modes))
 
     if "kwargs" not in setting:
         setting["kwargs"] = {}
@@ -91,31 +93,18 @@ def preprocess(cf: argparse.Namespace):
     processors = {k: import_class(f"util.preprocessing.processor.{v}") for k, v in processors.items()}
 
     # modes for each data processor
-    modes = setting.get("modes", None)
+    processor_modes = setting.get("modes", None)
 
-    subdir = "default" if cf.mode is None else cf.mode
+    subdir = "__".join(modes)
     out_path = os.path.join(cf.out_path, subdir)
     os.makedirs(out_path, exist_ok=True)
-
-    # multi_modal_data_group.visualize_sequence(processors={
-    #     "skeleton": SkeletonProcessor,
-    #     "inertial": InertialProcessor,
-    #     # "depth": DepthProcessor,
-    #     # "rgb": RGBVideoProcessor
-    # }, args={
-    #     "skeleton": {
-    #         "graph": Graph(skeleton_edges),
-    #         "joints": skeleton_joints
-    #     },
-    #     "actions": actions,
-    # })
-    # exit(0)
 
     create_labels(out_path, multi_modal_data_group, splits)
 
     # Create features for each modality and write them to files
     # Mode keys are equivalent to processor keys defined above to set the mode for a specific processor
-    multi_modal_data_group.produce_features(out_path, splits, processors=processors, modes=modes, **setting["kwargs"])
+    multi_modal_data_group.produce_features(out_path, splits, processors=processors, modes=processor_modes,
+                                            **setting["kwargs"])
 
 
 if __name__ == "__main__":

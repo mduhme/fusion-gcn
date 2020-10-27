@@ -12,7 +12,7 @@ class SkeletonProcessor(MatlabInputProcessor):
         super().__init__(mode)
 
     def get_required_loaders(self) -> Sequence[str]:
-        if self.mode == "skele+imu":
+        if self.mode == "imu_enhanced":
             return "skeleton", "inertial"
         elif self.mode == "op_bb":
             return "openpose_skeleton",
@@ -29,7 +29,7 @@ class SkeletonProcessor(MatlabInputProcessor):
         # shape is (num_samples, num_channels[=3], num_frames, num_joints[=20], num_bodies[=1])
         num_joints = self.main_structure.input_shape[1]
 
-        if self.mode == "skele+imu":
+        if self.mode == "imu_enhanced":
             num_joints += 2
 
         return [
@@ -74,7 +74,7 @@ class SkeletonProcessor(MatlabInputProcessor):
         # to (num_channels, num_frames, num_joints, num_bodies)
         skeleton = skeleton.transpose((3, 1, 2, 0))
 
-        if self.mode == "skele+imu":
+        if self.mode == "imu_enhanced":
             # Add acc and gyro to normalized skeleton
             inertial_sample = sample["inertial"].transpose()
             if inertial_sample.ndim == 2:

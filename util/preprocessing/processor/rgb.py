@@ -89,7 +89,7 @@ class RGBVideoProcessor(Processor):
         out_sample = np.zeros(out_shape, dtype=self.structure["skeleton"].target_type)
 
         # retrieve skeleton to rgb coordinates
-        if self.mode == "rgb_skeleton_patches":
+        if self.mode == "rgb_skeleton_patch_features":
             skeletons = sample["skeleton"]
             assert skeletons.ndim == 3 or skeletons.ndim == 4
             if skeletons.ndim == 4:
@@ -100,7 +100,7 @@ class RGBVideoProcessor(Processor):
 
             rgb_coords = extractor.get_skeleton_rgb_coords(skeletons)
 
-        elif self.mode == "rgb_openpose_skeleton_patches":
+        elif self.mode == "rgb_openpose_skeleton_patch_features":
             # Move axis:
             # Shape from (num_frames, num_joints, 2, num_bodies) to (num_bodies, num_frames, num_joints, 2)
             rgb_coords = np.moveaxis(sample["openpose_skeleton"], -1, 0)
@@ -194,7 +194,7 @@ class RGBVideoProcessor(Processor):
 
     def _process(self, sample, sample_lengths: dict, interpolators: Dict[str, SampleInterpolator], **kwargs):
         # RGB PATCH PROCESSING
-        if self.mode and "skeleton_patches" in self.mode:
+        if self.mode and "skeleton_patch_features" in self.mode:
             return self._process_patches(sample, **kwargs)
 
         # DEFAULT PROCESSING

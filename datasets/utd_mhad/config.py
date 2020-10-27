@@ -13,6 +13,30 @@ settings = {
             }
         },
 
+        "rgb_patches_op": {
+            "processors": {
+                "rgb": "rgb.RGBVideoProcessor"
+            },
+            "modes": {
+                "rgb": "rgb_openpose_skeleton_patches"
+            },
+            "kwargs": {
+                "skeleton_patch_extractor": skeleton_patch_extractor
+            }
+        },
+
+        "rgb_patches": {
+            "processors": {
+                "rgb": "rgb.RGBVideoProcessor"
+            },
+            "modes": {
+                "rgb": "rgb_skeleton_patches"
+            },
+            "kwargs": {
+                "skeleton_patch_extractor": skeleton_patch_extractor
+            }
+        },
+
         "rgb_patch_features_op": {
             "processors": {
                 "rgb": "rgb.RGBVideoProcessor"

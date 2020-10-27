@@ -4,7 +4,7 @@ import os
 import datasets.utd_mhad.io as io
 from datasets.utd_mhad.config import get_preprocessing_setting
 from datasets.utd_mhad.constants import *
-from datasets.utd_mhad.datagroup import DataGroup
+from util.preprocessing.datagroup import DataGroup
 from util.dynamic_import import import_class
 from util.merge import deep_merge_dictionary
 from util.preprocessing.data_loader import OpenposeBody25ToKinect1Loader, SequenceStructure
@@ -84,7 +84,7 @@ def preprocess(cf: argparse.Namespace):
         setting["kwargs"].update({
             "debug": True,
             "skeleton_edges": skeleton_edges,
-            "action_labels": actions,
+            "actions": actions,
             "skeleton_joint_labels": skeleton_joints
         })
 

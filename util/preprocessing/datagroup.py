@@ -1,5 +1,5 @@
-import copy
 import contextlib
+import copy
 import itertools
 import os
 from sys import stdout
@@ -9,10 +9,10 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-import datasets.utd_mhad.io as io
-from util.preprocessing.interpolator import SampleInterpolator, NearestNeighborInterpolator
-from util.preprocessing.data_writer import FileWriter
 from util.preprocessing.data_loader import Loader
+from util.preprocessing.data_writer import FileWriter
+from util.preprocessing.file_meta_data import FileMetaData
+from util.preprocessing.interpolator import SampleInterpolator, NearestNeighborInterpolator
 from util.preprocessing.processor.base import Processor
 
 
@@ -23,7 +23,7 @@ class DataGroup:
         self.default_interpolator_type = NearestNeighborInterpolator
 
     @staticmethod
-    def create(files: Sequence[Tuple[Loader, Sequence[io.FileMetaData]]]):
+    def create(files: Sequence[Tuple[Loader, Sequence[FileMetaData]]]):
         assert len(files) > 0, "Must specify at least one modality"
 
         modalities = [f[0].name for f in files]
@@ -38,19 +38,20 @@ class DataGroup:
 
         for x in range(num_samples):
             subject = modality_files[0][x].subject
-            trial = modality_files[0][x].trial
-            action_label = modality_files[0][x].action_label
+            action = modality_files[0][x].action
+            properties = modality_files[0][x].properties
 
             # check modalities are in correct order
             for m in range(1, num_modalities):
                 assert modality_files[m][x].subject == subject
-                assert modality_files[m][x].trial == trial
-                assert modality_files[m][x].action_label == action_label
+                assert modality_files[m][x].action == action
+                assert modality_files[m][x].properties == properties
 
-            metadata = [subject, trial, action_label, *(modality_files[i][x].file_name for i in range(num_modalities))]
+            properties = [v for v in properties.values()]
+            metadata = [subject, action, *properties, *(modality_files[i][x].file_name for i in range(num_modalities))]
             data_list.append(metadata)
 
-        columns = ["subject", "trial", "action", *modalities]
+        columns = ["subject", "action", *modality_files[0][0].properties.keys(), *modalities]
         return DataGroup(pd.DataFrame(data_list, columns=columns), loaders)
 
     def _get_interpolators(self,
@@ -197,9 +198,12 @@ class DataGroup:
 
                 transformed_sample_iter = self._process_input_samples(input_samples, main_modality, processors,
                                                                       interpolators, writers, **kwargs)
-                for _ in tqdm(transformed_sample_iter, "Processing samples", total=num_samples, file=stdout):
-                    # Do nothing, 'writers' take care of writing to file
-                    pass
+                if out_path:
+                    for _ in tqdm(transformed_sample_iter, "Processing samples", total=num_samples, file=stdout):
+                        # Do nothing, 'writers' take care of writing to file
+                        pass
+                else:
+                    return transformed_sample_iter
 
     def produce_labels(self, splits: Dict[str, tuple] = None) -> Union[np.ndarray, Dict[str, np.ndarray]]:
         """
@@ -222,13 +226,11 @@ class DataGroup:
                            start_frame: int = 0,
                            end_frame: int = -1,
                            subject: int = 0,
-                           trial: int = 0,
                            action: int = 0,
                            main_modality: Optional[str] = None,
                            modes: Optional[Dict[str, str]] = None,
                            **kwargs):
         row = self.data[(self.data["subject"] == subject) &
-                        (self.data["trial"] == trial) &
                         (self.data["action"] == action)]
 
         modes, max_sequence_length, processors, required_loaders, interpolators = \
@@ -244,18 +246,17 @@ class DataGroup:
                                                               interpolators, None)
         untransformed_sample, transformed_sample = next(itertools.islice(transformed_sample_iter, 1))
 
-        import cv2
         import matplotlib.pyplot as plt
         from util.visualization.skeleton import SkeletonVisualizer
         from util.visualization.visualizer import Controller
 
         fig: plt.Figure = plt.figure()
         ax = fig.add_subplot(projection="3d")
-        figure_title = f"unprocessed; subject {subject + 1}; trial {trial + 1}"
+        figure_title = f"unprocessed; subject {subject + 1}"
 
         if action_list := args.get("actions", None):
-            action_label = action_list[action]
-            figure_title += f"; action {action + 1} ({action_label})"
+            action = action_list[action]
+            figure_title += f"; action {action + 1} ({action})"
 
         fig.suptitle(figure_title)
         vis = SkeletonVisualizer()

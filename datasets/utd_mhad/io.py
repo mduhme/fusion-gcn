@@ -2,21 +2,7 @@ import os
 
 from datasets.utd_mhad.constants import *
 from util.preprocessing.data_loader import SequenceStructure, MatlabLoader, RGBVideoLoader
-
-
-class FileMetaData:
-    """
-    Stores file name, subject, trial and action label for each file.
-    """
-    def __init__(self, fn: str, subject: int, trial: int, action_label: int):
-        assert subject >= 0 and trial >= 0 and action_label >= 0
-        self.file_name = fn
-        self.subject = subject
-        self.trial = trial
-        self.action_label = action_label
-
-    def __str__(self):
-        return os.path.splitext(os.path.basename(self.file_name))[0]
+from util.preprocessing.file_meta_data import FileMetaData
 
 
 def parse_file_name(file_name: str):
@@ -25,7 +11,7 @@ def parse_file_name(file_name: str):
     action_idx = int(action_idx) - 1
     subject_idx = int(subject_idx) - 1
     trial_idx = int(trial_idx) - 1
-    return FileMetaData(file_name, subject_idx, trial_idx, action_idx)
+    return FileMetaData(file_name, subject_idx, action_idx, trial=trial_idx)
 
 
 def get_files(data_path: str):

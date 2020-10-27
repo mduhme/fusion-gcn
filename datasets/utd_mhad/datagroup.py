@@ -170,7 +170,8 @@ class DataGroup:
             self._setup_processing(main_modality, processors, modes, kwargs.get("interpolators", None))
 
         print("START PREPROCESSING")
-        print("Modes:", ", ".join(f"{k}: {v}" for k, v in modes.items() if v))
+        if len(modes) > 0:
+            print("Modes:", ", ".join(f"{k}: {v}" for k, v in modes.items() if v))
 
         # Process all modalities for each split
         for split_name, split in splits.items():

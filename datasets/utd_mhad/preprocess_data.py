@@ -17,6 +17,7 @@ def get_configuration() -> argparse.Namespace:
                         help="Destination directory for processed data.")
     parser.add_argument("--mode", type=str, help="Mode to decide how to process the dataset."
                                                  " See preprocess_data.py:get_preprocessing_setting")
+    parser.add_argument("--debug", action="store_true", help="debug mode")
     return parser.parse_args()
 
 
@@ -74,6 +75,17 @@ def preprocess(cf: argparse.Namespace):
 
     setting = get_preprocessing_setting(cf.mode)
 
+    if "kwargs" not in setting:
+        setting["kwargs"] = {}
+
+    if cf.debug:
+        setting["kwargs"].update({
+            "debug": True,
+            "skeleton_edges": skeleton_edges,
+            "action_labels": actions,
+            "skeleton_joint_labels": skeleton_joints
+        })
+
     # which data processors to use (will be dynamically loaded from util.preprocessing.processor)
     processors = setting["processors"]
     processors = {k: import_class(f"util.preprocessing.processor.{v}") for k, v in processors.items()}
@@ -103,8 +115,7 @@ def preprocess(cf: argparse.Namespace):
 
     # Create features for each modality and write them to files
     # Mode keys are equivalent to processor keys defined above to set the mode for a specific processor
-    multi_modal_data_group.produce_features(out_path, splits, processors=processors, modes=modes,
-                                            skeleton_patch_extractor=skeleton_patch_extractor)
+    multi_modal_data_group.produce_features(out_path, splits, processors=processors, modes=modes, **setting["kwargs"])
 
 
 if __name__ == "__main__":

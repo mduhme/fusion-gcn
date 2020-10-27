@@ -14,9 +14,17 @@ class SkeletonProcessor(MatlabInputProcessor):
     def get_required_loaders(self) -> Sequence[str]:
         if self.mode == "skele+imu":
             return "skeleton", "inertial"
+        elif self.mode == "op_bb":
+            return "openpose_skeleton",
         return "skeleton",
 
     def _get_output_shape(self, num_samples: int, **kwargs) -> Sequence[int]:
+        if self.mode == "op_bb":
+            return [
+                num_samples,
+                4
+            ]
+
         # self.loader.input_shape is (num_frames, num_joints[=20], num_channels[=3])
         # shape is (num_samples, num_channels[=3], num_frames, num_joints[=20], num_bodies[=1])
         num_joints = self.main_structure.input_shape[1]
@@ -34,6 +42,22 @@ class SkeletonProcessor(MatlabInputProcessor):
 
     def _process(self, sample, sample_lengths: dict, interpolators: Dict[str, SampleInterpolator],
                  **kwargs) -> np.ndarray:
+
+        # Extract 2D person bounding box from openpose skeleton
+        if self.mode == "op_bb":
+            # Shape from (num_frames, num_joints, 2, num_bodies) to (num_bodies, num_joints, num_frames, 2)
+            sample = np.transpose(sample, (3, 1, 0, 2))
+            x = sample[:, :, 0]
+            y = sample[:, :, 1]
+            x = x[x != 0]
+            y = y[y != 0]
+            x_min = np.min(x)
+            y_min = np.min(y)
+            x_max = np.max(x)
+            y_max = np.max(y)
+            v = np.hstack((x_min, y_min, x_max, y_max))
+            return v
+
         if type(sample) is dict:
             skeleton = sample["skeleton"]
         else:

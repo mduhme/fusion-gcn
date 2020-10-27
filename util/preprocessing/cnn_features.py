@@ -1,7 +1,10 @@
-import numpy as np
+from typing import Optional
+
 import cv2
+import numpy as np
 import torch
 import torchvision.models as models
+from torch.nn.functional import softmax
 
 # set model download location
 # torch.hub.set_dir()
@@ -23,14 +26,14 @@ googlenet = _prepare_model(googlenet)
 
 
 models = {
-    "resnet18": (resnet18, 512, lambda x: prepare_image_resnet(x), lambda x: x),
+    "resnet18": (resnet18, 512, lambda x: prepare_image_resnet(x), lambda x: softmax(x, 1)),
     "squeezenet": (squeezenet, 512, lambda x: x, lambda x: torch.mean(x, -1)),
-    "googlenet": (googlenet, 1024, lambda x: x, lambda x: x)
+    "googlenet": (googlenet, 1024, lambda x: x, lambda x: softmax(x, 1))
 }
 default_model = "resnet18"
 
 
-def get_feature_size(model_name: str = None) -> int:
+def get_feature_size(model_name: Optional[str] = None) -> int:
     model_name = model_name or default_model
     return models[model_name][1]
 
@@ -53,7 +56,6 @@ def encode_sample(sample: np.ndarray, model_name: str = None, cuda=True) -> np.n
     input_fn = models[model_name][2]
     output_fn = models[model_name][3]
 
-    dtype = sample.dtype
     sample = input_fn(sample)
 
     if sample.ndim == 3:

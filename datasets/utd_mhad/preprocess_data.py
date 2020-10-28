@@ -4,10 +4,10 @@ import os
 import datasets.utd_mhad.io as io
 from datasets.utd_mhad.config import get_preprocessing_setting
 from datasets.utd_mhad.constants import *
-from util.preprocessing.datagroup import DataGroup
 from util.dynamic_import import import_class
 from util.merge import deep_merge_dictionary
 from util.preprocessing.data_loader import OpenposeBody25ToKinect1Loader, SequenceStructure
+from util.preprocessing.datagroup import DataGroup
 
 
 def get_configuration() -> argparse.Namespace:
@@ -103,7 +103,7 @@ def preprocess(cf: argparse.Namespace):
 
     # Create features for each modality and write them to files
     # Mode keys are equivalent to processor keys defined above to set the mode for a specific processor
-    multi_modal_data_group.produce_features(out_path, splits, processors=processors, modes=processor_modes,
+    multi_modal_data_group.produce_features(splits, processors=processors, modes=processor_modes, out_path=out_path,
                                             **setting["kwargs"])
 
 

@@ -21,7 +21,6 @@ def to_numpy(video: cv2.VideoCapture, input_shape: Sequence[int], dtype: type) -
     w, h = int(video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     if w != input_shape[1] or h != input_shape[0]:
-        video.release()
         raise ValueError("Video frame dimension does not match input_shape")
 
     output = np.empty((num_frames, *input_shape), dtype=dtype)

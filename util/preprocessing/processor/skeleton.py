@@ -30,14 +30,14 @@ class SkeletonProcessor(MatlabInputProcessor):
         num_joints = self.main_structure.input_shape[1]
 
         if self.mode == "imu_enhanced":
-            num_joints += 2
+            num_joints += kwargs["imu_num_signals"]
 
         return [
             num_samples,
-            self.main_structure.input_shape[-1],
+            kwargs.get("num_bodies", 1),
             self.max_sequence_length,
             num_joints,
-            kwargs.get("num_bodies", 1)
+            self.main_structure.input_shape[-1],
         ]
 
     def _process(self, sample, sample_lengths: dict, interpolators: Dict[str, SampleInterpolator],
@@ -68,24 +68,25 @@ class SkeletonProcessor(MatlabInputProcessor):
             skeleton = np.expand_dims(skeleton, axis=0)
         assert skeleton_util.is_valid(skeleton)
 
-        # TODO generalize this, only works for UTD-MHAD for now
-        skeleton = skeleton_util.normalize_skeleton(skeleton, 2, (3, 2), (4, 8))
-        # Permute from (num_bodies, num_frames, num_joints, num_channels)
-        # to (num_channels, num_frames, num_joints, num_bodies)
-        skeleton = skeleton.transpose((3, 1, 2, 0))
+        skeleton_center_joint = kwargs["skeleton_center_joint"]
+        skeleton_x_joints = kwargs["skeleton_x_joints"]
+        skeleton_z_joints = kwargs["skeleton_z_joints"]
+        skeleton = skeleton_util.normalize_skeleton(skeleton, skeleton_center_joint, skeleton_z_joints,
+                                                    skeleton_x_joints)
 
         if self.mode == "imu_enhanced":
             # Add acc and gyro to normalized skeleton
-            inertial_sample = sample["inertial"].transpose()
+            inertial_sample = sample["inertial"]
             if inertial_sample.ndim == 2:
-                inertial_sample = np.expand_dims(inertial_sample, axis=-1)
+                inertial_sample = np.expand_dims(inertial_sample, axis=0)
             num_joints_old = skeleton.shape[-2]
+            imu_num_signals = kwargs["imu_num_signals"]
             new_shape = list(skeleton.shape)
-            new_shape[-2] += 2
+            new_shape[-2] += imu_num_signals
             extended_skeleton = np.zeros(new_shape, dtype=skeleton.dtype)
             extended_skeleton[:, :, :num_joints_old] = skeleton
-            extended_skeleton[:, :, num_joints_old] = inertial_sample[:3]
-            extended_skeleton[:, :, num_joints_old+1] = inertial_sample[3:]
+            for i, s in enumerate(inertial_sample):
+                extended_skeleton[i, :, num_joints_old:] = np.reshape(s, (s.shape[0], imu_num_signals, 3))
             return extended_skeleton
 
         return skeleton

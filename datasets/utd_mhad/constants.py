@@ -2,7 +2,7 @@ import re
 
 import numpy as np
 
-from util.preprocessing.skeleton_patch_extractor import SkeletonPatchExtractor
+from util.preprocessing.skeleton_patch_extractor import SkeletonToRgbCoordinateTransformer
 
 depth_data_path = "Depth"
 inertial_data_path = "Inertial"
@@ -22,6 +22,10 @@ skeleton_shape = (skeleton_max_sequence_length, 20, 3)
 inertial_shape = (inertial_max_sequence_length, 6)  # 3x acceleration + 3x rotation
 rgb_shape = (rgb_max_sequence_length, 480, 640, 3)
 depth_shape = (depth_max_sequence_length, 240, 320)
+
+skeleton_center_joint = 2
+skeleton_x_joints = (4, 8)
+skeleton_z_joints = (3, 2)
 
 default_data_shape = (3, skeleton_max_sequence_length, 20, 1)
 
@@ -129,4 +133,4 @@ R = np.array([
 ])
 T = np.array([1.9985242312092553e-02, -7.4423738761617583e-04, -1.0916736334336222e-02]) * 2
 
-skeleton_patch_extractor = SkeletonPatchExtractor(f_rgb, f_depth, T, R, rgb_dim, depth_dim)
+skeleton_to_rgb_transformer = SkeletonToRgbCoordinateTransformer(f_rgb, f_depth, T, R, rgb_dim, depth_dim)

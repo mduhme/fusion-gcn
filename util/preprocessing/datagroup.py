@@ -149,22 +149,22 @@ class DataGroup:
             yield unprocessed_sample, transformed_sample
 
     def produce_features(self,
-                         out_path: str,
                          splits: Dict[str, tuple],
                          processors: Dict[str, Type[Processor]],
                          main_modality: Optional[str] = None,
                          modes: Optional[Dict[str, str]] = None,
+                         out_path: Optional[str] = None,
                          **kwargs):
         """
         Produces features for each modality and stores them under the specified path. If main_modality is None,
         there will be no interpolation and a dictionary filled with None for each key is returned.
 
-        :param out_path: Path where results will be stored
         :param splits: Dataset splits (e.g. train, validation) with a tuple of subjects (int) that are part of the set
         :param processors: Types of processors that should be used to transform input samples
         :param main_modality: All other modalities are interpolated so their sequence lengths
         are equal to the maximum sequence length of this modality.
         :param modes: A dictionary of modes for each modality
+        :param out_path: Path where results will be stored. If None, return a generator for processed samples.
         that defines the way features of that modality are processed.
         """
         modes, max_sequence_length, processors, required_loaders, interpolators = \

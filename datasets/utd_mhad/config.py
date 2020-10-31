@@ -63,7 +63,6 @@ settings = {
 
     # Extract RGB patches by projecting the skeleton 3D coordinates to 2D RGB coordinates.
     # Mode should only be used for iterating over processed samples, not for output.
-    # Writing to a file requires ~150GB for UTD-MHAD for a patch size of 128x128
     "rgb_patches": {
         "processors": {
             "rgb": "rgb.RGBVideoProcessor"
@@ -72,7 +71,10 @@ settings = {
             "rgb": "rgb_skeleton_patches"
         },
         "kwargs": {
-            "skeleton_to_rgb_coordinate_transformer": skeleton_to_rgb_transformer
+            "skeleton_to_rgb_coordinate_transformer": skeleton_to_rgb_transformer,
+
+            # Writing to an uncompressed file requires ~150GB for UTD-MHAD for a patch size of 128x128
+            "rgb_compress_patches": True,
         }
     },
 
@@ -133,7 +135,7 @@ settings = {
         "kwargs": {
             # Crop options (Set to None or remove for no cropping)
             # (MinX, MaxX, MinY, MaxY), Min is inclusive, Max isn't
-            "rgb_crop_square": (110, 460, 110, 460),
+            "rgb_crop_square": (100, 480, 100, 480),
 
             # Resize options (Set to desired size or to original size for no resizing)
             "rgb_output_size": (128, 128),

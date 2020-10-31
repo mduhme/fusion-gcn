@@ -1,5 +1,6 @@
 import abc
 import os
+import zipfile
 from typing import Sequence
 
 import cv2
@@ -80,6 +81,24 @@ class NumpyWriter(FileWriter):
 
     def _collect_next(self, sequence: np.ndarray, sample_index: int):
         self._data_store.data[sample_index] = sequence
+
+
+class ZipNumpyWriter(FileWriter):
+    def __init__(self, out_path: str):
+        super().__init__(out_path)
+        self._zip_file = None
+
+    def start_collect(self):
+        if self._zip_file is None:
+            self._zip_file = zipfile.ZipFile(self.out_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9)
+
+    def end_collect(self):
+        if self._zip_file is not None:
+            self._zip_file.close()
+
+    def _collect_next(self, sequence: np.ndarray, sample_index: int):
+        with self._zip_file.open(f"s{sample_index}", "w") as out_file:
+            np.save(out_file, sequence)
 
 
 class VideoWriter(FileWriter):

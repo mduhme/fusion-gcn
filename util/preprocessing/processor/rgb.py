@@ -6,7 +6,7 @@ import numpy as np
 import util.preprocessing.cnn_features as feature_util
 import util.preprocessing.skeleton as skeleton_util
 import util.preprocessing.video as video_util
-from util.preprocessing.data_writer import FileWriter, NumpyWriter, VideoWriter
+from util.preprocessing.data_writer import FileWriter, NumpyWriter, VideoWriter, ZipNumpyWriter
 from util.preprocessing.interpolator import SampleInterpolator
 from util.preprocessing.processor.base import Processor
 from util.preprocessing.skeleton_patch_extractor import get_skeleton_rgb_patch_groups, get_skeleton_rgb_patches
@@ -43,7 +43,6 @@ class RGBVideoProcessor(Processor):
 
     def collect(self, out_path: str, num_samples: int, **kwargs) -> FileWriter:
         # Write patch feature vectors to file
-        skeleton_joints = self.structure["skeleton"].input_shape[1]
         joint_groups = kwargs.get("joint_groups", None)
         if self.mode in ("rgb_skeleton_patch_features",
                          "rgb_openpose_skeleton_patch_features"):
@@ -56,26 +55,30 @@ class RGBVideoProcessor(Processor):
 
                 # if joints should be grouped, output will be number of groups
                 # else (group for each joint) number of joints
-                skeleton_joints if joint_groups is None else len(joint_groups),
+                self.structure["skeleton"].input_shape[1] if joint_groups is None else len(joint_groups),
                 feature_util.get_feature_size(kwargs.get("rgb_feature_model", None)),
             ]
             return NumpyWriter(out_path, self.structure["skeleton"].target_type, shape)
 
         # Write patches themselves to file (should only be used for very small patch radii)
         if self.mode in ("rgb_skeleton_patches", "rgb_openpose_skeleton_patches"):
-            out_path += ".npy"
-            # shape is (num_samples, num_bodies[=1], num_frames, num_joints[=20], frame_height, frame_width, channels)
-            patch_radius = kwargs.get("patch_radius", 64)
-            shape = [
-                num_samples,
-                kwargs.get("num_bodies", 1),  # num bodies
-                self.max_sequence_length,
-                skeleton_joints,  # num joints same as skeleton
-                patch_radius * 2,
-                patch_radius * 2,
-                self.main_structure.input_shape[-1],  # num channels [=3]
-            ]
-            return NumpyWriter(out_path, self.structure["skeleton"].target_type, shape)
+            if kwargs.get("rgb_compress_patches", True):
+                out_path += ".zip"
+                return ZipNumpyWriter(out_path)
+            else:
+                out_path += ".npy"
+                # (num_samples, num_bodies[=1], num_frames, num_joints[=20], frame_height, frame_width, channels)
+                patch_radius = kwargs.get("patch_radius", 64)
+                shape = [
+                    num_samples,
+                    kwargs.get("num_bodies", 1),  # num bodies
+                    self.max_sequence_length,
+                    self.structure["skeleton"].input_shape[1],  # num joints same as skeleton
+                    patch_radius * 2,
+                    patch_radius * 2,
+                    self.main_structure.input_shape[-1],  # num channels [=3]
+                ]
+                return NumpyWriter(out_path, self.structure["skeleton"].target_type, shape)
 
         # Default: Just write video with cropped and resized frames
         as_numpy = kwargs.get("rgb_output_numpy", False)
@@ -179,8 +182,13 @@ class RGBVideoProcessor(Processor):
         rgb_coords = self._get_skeleton_to_rgb_coords(sample, **kwargs)
 
         # extract patches for each coordinate and compute features
-        patch_offset = kwargs.get("patch_radius") if joint_groups is None else kwargs.get("joint_groups_box_margin", 0)
-        patch_extractor = get_skeleton_rgb_patches if joint_groups is None else get_skeleton_rgb_patch_groups
+        if joint_groups is None:
+            patch_offset = kwargs.get("patch_radius", 64)
+            patch_extractor = get_skeleton_rgb_patches
+        else:
+            patch_offset = kwargs.get("joint_groups_box_margin", 0)
+            patch_extractor = get_skeleton_rgb_patch_groups
+
         debug = kwargs.get("debug", False)
         for frame_idx, frame in enumerate(sample["rgb"]):
             for body_idx, sequence in enumerate(rgb_coords):
@@ -204,8 +212,10 @@ class RGBVideoProcessor(Processor):
 
                 # Encode patches using CNN and write to output array
                 for patch_idx, patch in enumerate(patches):
-                    feature = feature_util.encode_sample(patch, feature_model)
-                    out_sample[body_idx, frame_idx, patch_idx] = feature.astype(out_sample.dtype)
+                    # Check if any element is greater than zero (all zero patch comes from invalid coordinates)
+                    if np.any(patch):
+                        feature = feature_util.encode_sample(patch, feature_model)
+                        out_sample[body_idx, frame_idx, patch_idx] = feature.astype(out_sample.dtype)
 
                 if debug and joint_groups is None and frame_idx > 0:
                     joint_labels = kwargs["skeleton_joint_labels"]
@@ -229,7 +239,7 @@ class RGBVideoProcessor(Processor):
         return out_sample
 
     def _process_default(self, sample, **kwargs):
-        as_numpy = kwargs.get("rgb_default_as_numpy", False)
+        as_numpy = kwargs.get("rgb_output_numpy", False)
         w, h = kwargs["rgb_output_size"]
         rgb_crop_square = kwargs.get("rgb_crop_square", None)
         rgb_resize_interpolation = kwargs.get("rgb_resize_interpolation", None)
@@ -243,8 +253,6 @@ class RGBVideoProcessor(Processor):
             # resize frame
             if f.shape[0] != h or f.shape[1] != w:
                 f = cv2.resize(f, (h, w), interpolation=rgb_resize_interpolation)
-            # (h, w, c) to (c, h, w)
-            f = np.moveaxis(f, -1, 0)
             return f
 
         if as_numpy:
@@ -252,6 +260,9 @@ class RGBVideoProcessor(Processor):
 
             for frame_idx, frame in enumerate(sample):
                 # frame is shape (h, w, c)
+                frame = transform_frame(frame)
+                # (h, w, c) to (c, h, w)
+                frame = np.moveaxis(frame, -1, 0)
                 output_array[frame_idx] = transform_frame(frame)
 
             return output_array

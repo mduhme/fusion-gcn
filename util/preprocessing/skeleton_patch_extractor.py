@@ -44,10 +44,12 @@ def get_skeleton_rgb_patches(rgb: np.ndarray,
     patches = np.zeros((n, s, s, c), dtype=rgb.dtype)
 
     for idx, coord in enumerate(coords):
-        x1, x0 = np.clip(coord[1] + t * patch_radius, 0, w)
-        y1, y0 = np.clip(coord[0] + t * patch_radius, 0, h)
-        xd, yd = x1 - x0, y1 - y0
-        patches[idx, :yd, :xd] = rgb[y0:y1, x0:x1]
+        # Only extract patch if coordinates are valid (!= 0)
+        if coord.sum():
+            x1, x0 = np.clip(coord[1] + t * patch_radius, 0, w)
+            y1, y0 = np.clip(coord[0] + t * patch_radius, 0, h)
+            xd, yd = x1 - x0, y1 - y0
+            patches[idx, :yd, :xd] = rgb[y0:y1, x0:x1]
 
     if return_debug_image:
         debug_img = np.zeros_like(rgb)
@@ -56,17 +58,19 @@ def get_skeleton_rgb_patches(rgb: np.ndarray,
 
         # Copy only patches
         for coord in coords:
-            x1, x0 = np.clip(coord[0] + t * patch_radius, 0, w)
-            y1, y0 = np.clip(coord[1] + t * patch_radius, 0, h)
-            debug_img[y0:y1, x0:x1] = rgb[y0:y1, x0:x1]
+            if coord.sum():
+                x1, x0 = np.clip(coord[0] + t * patch_radius, 0, w)
+                y1, y0 = np.clip(coord[1] + t * patch_radius, 0, h)
+                debug_img[y0:y1, x0:x1] = rgb[y0:y1, x0:x1]
 
         # Show patch centers and boxes
         if kwargs.get("show_boxes", True):
             for coord in coords:
-                center_rect = (int(coord[0]) - r, int(coord[1]) - r, r * 2, r * 2)
-                bb_rect = (int(coord[0]) - patch_radius, int(coord[1]) - patch_radius, s, s)
-                debug_img = cv2.rectangle(debug_img, center_rect, color, -1)
-                debug_img = cv2.rectangle(debug_img, bb_rect, color, 1)
+                if coord.sum():
+                    center_rect = (int(coord[0]) - r, int(coord[1]) - r, r * 2, r * 2)
+                    bb_rect = (int(coord[0]) - patch_radius, int(coord[1]) - patch_radius, s, s)
+                    debug_img = cv2.rectangle(debug_img, center_rect, color, -1)
+                    debug_img = cv2.rectangle(debug_img, bb_rect, color, 1)
 
         return patches, debug_img
 
@@ -97,7 +101,7 @@ def get_skeleton_rgb_patch_groups(rgb: np.ndarray,
     :return: A list of extracted patches, one for each group of coordinates.
     """
     h, w, c = rgb.shape
-    patches = []
+    patches = [None] * len(coord_groups)
 
     # Check if only one margin is provided for all boxes
     if type(patch_margin) is int or (type(patch_margin) in (tuple, list) and
@@ -108,9 +112,11 @@ def get_skeleton_rgb_patch_groups(rgb: np.ndarray,
         assert len(patch_margin) == len(coord_groups), "Must provided one margin for each group"
 
     for group_idx, group in enumerate(coord_groups):
-        min_x, max_x, min_y, max_y = _get_group_bounding_box(group, patch_margin[group_idx], w, h)
-        patch = rgb[min_y:max_y, min_x:max_x]
-        patches.append(patch)
+        # Only extract patch if some coordinates in the group are valid (!= 0)
+        if group.sum():
+            min_x, max_x, min_y, max_y = _get_group_bounding_box(group, patch_margin[group_idx], w, h)
+            patch = rgb[min_y:max_y, min_x:max_x]
+            patches[group_idx] = patch
 
     if fixed_patch_size is not None:
         for idx, patch in enumerate(patches):
@@ -123,17 +129,19 @@ def get_skeleton_rgb_patch_groups(rgb: np.ndarray,
 
         # Copy only patches
         for group_idx, group in enumerate(coord_groups):
-            min_x, max_x, min_y, max_y = _get_group_bounding_box(group, patch_margin[group_idx], w, h)
-            debug_img[min_y:max_y, min_x:max_x] = rgb[min_y:max_y, min_x:max_x]
+            if group.sum():
+                min_x, max_x, min_y, max_y = _get_group_bounding_box(group, patch_margin[group_idx], w, h)
+                debug_img[min_y:max_y, min_x:max_x] = rgb[min_y:max_y, min_x:max_x]
 
         # Show patch centers and boxes
         if kwargs.get("show_boxes", True):
             for group_idx, group in enumerate(coord_groups):
-                min_x, max_x, min_y, max_y = _get_group_bounding_box(group, patch_margin[group_idx], w, h)
-                center_rect = ((max_x + min_x) // 2 - r, (max_y + min_y) // 2 - r, r * 2, r * 2)
-                bb_rect = (min_x, min_y, max_x - min_x, max_y - min_y)
-                debug_img = cv2.rectangle(debug_img, center_rect, color, -1)
-                debug_img = cv2.rectangle(debug_img, bb_rect, color, 1)
+                if group.sum():
+                    min_x, max_x, min_y, max_y = _get_group_bounding_box(group, patch_margin[group_idx], w, h)
+                    center_rect = ((max_x + min_x) // 2 - r, (max_y + min_y) // 2 - r, r * 2, r * 2)
+                    bb_rect = (min_x, min_y, max_x - min_x, max_y - min_y)
+                    debug_img = cv2.rectangle(debug_img, center_rect, color, -1)
+                    debug_img = cv2.rectangle(debug_img, bb_rect, color, 1)
 
         return patches, debug_img
 

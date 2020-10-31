@@ -1,3 +1,11 @@
+"""
+Original code from https://github.com/kenshohara/3D-ResNets-PyTorch
+
+Kensho Hara, Hirokatsu Kataoka, & Yutaka Satoh (2018).
+Can Spatiotemporal 3D CNNs Retrace the History of 2D CNNs and ImageNet?.
+In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR) (pp. 6546–6555).
+"""
+
 import math
 from functools import partial
 

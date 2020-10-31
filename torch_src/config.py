@@ -40,6 +40,35 @@ def get_available_datasets():
     return datasets
 
 
+def prepare_input_data_loader(input_data):
+    err_str = "'input_data' must be a path (str) OR a sequence of/a single dictionary with member 'path'"
+    if type(input_data) not in (str, dict, list, tuple):
+        raise ValueError(err_str)
+    if type(input_data) is str:
+        input_data = [{"path": input_data}]
+    elif type(input_data) is dict:
+        input_data = [input_data]
+
+    input_data_prep = []
+
+    for d in input_data:
+        if "path" not in d:
+            raise ValueError(err_str)
+
+        path = d["path"]
+
+        if not os.path.exists(path):
+            raise ValueError("Input path does not exist: " + path)
+
+        loader_str = d.get("loader", "NumpyDatasetLoader")
+        loader_class = import_class("loader." + loader_str)
+        loader_args = d.get("loader_args", {})
+        loader_instance = loader_class(**loader_args)
+        input_data_prep.append((os.path.abspath(path), loader_instance))
+
+    return input_data_prep
+
+
 def get_configuration(session_types: tuple, optimizer_choices: tuple,
                       lr_scheduler_choices: tuple) -> argparse.Namespace:
     """
@@ -57,9 +86,10 @@ def get_configuration(session_types: tuple, optimizer_choices: tuple,
                         help="Specify which dataset constants to load from the 'datasets' subdirectory.")
     parser.add_argument("-s", "--session_type", type=str, choices=session_types,
                         help="Session type: Training or Evaluation.")
-    parser.add_argument("-l", "--loader", type=str, help="Which loader to use to read the dataset.")
-    parser.add_argument("--in_path", type=str, help="Path to data sets for training/validation")
-    parser.add_argument("--out_path", type=str,
+    parser.add_argument("-i", "--input_data", type=str, help="Comma separated list to input data paths. "
+                                                             "Each path will use the default numpy loader. "
+                                                             "For specific loader use configuration file.")
+    parser.add_argument("-o", "--out_path", type=str,
                         help="Path where trained models temporary results / checkpoints will be stored")
     parser.add_argument("--base_lr", type=float, help="Initial learning rate")
     parser.add_argument("--batch_size", type=int, help="Batch size (Should be multiple of 8 if using mixed precision)")
@@ -88,7 +118,7 @@ def get_configuration(session_types: tuple, optimizer_choices: tuple,
         load_and_merge_configuration(config, config.file)
 
     # Raise an error if any of the required arguments aren't provided
-    required_args = ["in_path", "out_path", "model", "dataset", "session_type", "loader"]
+    required_args = ["input_data", "out_path", "model", "dataset", "session_type"]
     if not all(hasattr(config, attr) for attr in required_args):
         raise LookupError("The following arguments are required: " + ", ".join(required_args))
 
@@ -114,15 +144,8 @@ def get_configuration(session_types: tuple, optimizer_choices: tuple,
     assert config.batch_size % config.grad_accum_step == 0, \
         "Gradient accumulation step size must be a factor of batch size"
 
-    # Data input path must exist
-    if not os.path.exists(config.in_path):
-        raise ValueError("Input path does not exist: " + config.in_path)
-
-    config.in_path = os.path.abspath(config.in_path)
+    config.input_data = prepare_input_data_loader(config.input_data)
     config.out_path = os.path.abspath(config.out_path)
-
-    # Load Dataset handler
-    setattr(config, "loader_type", import_class(config.loader))
 
     if not hasattr(config, "mode"):
         setattr(config, "mode", None)

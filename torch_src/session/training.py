@@ -8,6 +8,7 @@ from config import fill_model_config
 from progress import ProgressLogger, CheckpointManager
 from session.procedures.batch_train import BatchProcessor, get_batch_processor_from_config
 from session.session import Session
+from dataset import MultiModalDataset
 
 
 class TrainingSession(Session):
@@ -17,11 +18,10 @@ class TrainingSession(Session):
     def _load_data(self, batch_size, test_batch_size) -> Tuple[DataLoader, DataLoader]:
         shuffle = not self._base_config.disable_shuffle
         worker_init_fn = torch_util.set_seed if self._base_config.fixed_seed is not None else None
-        training_data = DataLoader(
-            self._base_config.loader_type(self._base_config.in_path, "train", in_memory=self._base_config.in_memory),
-            batch_size, shuffle=shuffle, drop_last=True, worker_init_fn=worker_init_fn)
+        training_data = DataLoader(MultiModalDataset(self._base_config.input_data, "train"), batch_size,
+                                   shuffle=shuffle, drop_last=True, worker_init_fn=worker_init_fn)
 
-        validation_data = DataLoader(self._base_config.loader_type(self._base_config.in_path, "val"),
+        validation_data = DataLoader(MultiModalDataset(self._base_config.input_data, "val"),
                                      test_batch_size, shuffle=False, drop_last=False, worker_init_fn=worker_init_fn)
         return training_data, validation_data
 

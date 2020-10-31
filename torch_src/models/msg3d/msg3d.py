@@ -1,3 +1,11 @@
+"""
+Original code from https://github.com/kenziyuliu/ms-g3d
+
+Liu, Z., Zhang, H., Chen, Z., Wang, Z., & Ouyang, W. (2020).
+Disentangling and Unifying Graph Convolutions for Skeleton-Based Action Recognition.
+In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (pp. 143–152).
+"""
+
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
@@ -144,8 +152,13 @@ class Model(nn.Module):
         self.fc = nn.Linear(c3, num_classes)
 
     def forward(self, x):
-        N, C, T, V, M = x.size()
-        x = x.permute(0, 4, 3, 1, 2).contiguous().view(N, M * V * C, T)
+        # ORIGINAL
+        # N, C, T, V, M = x.size()
+        # x = x.permute(0, 4, 3, 1, 2).contiguous().view(N, M * V * C, T)
+
+        N, M, T, V, C = x.size()
+        x = x.permute(0, 1, 3, 4, 2).contiguous().view(N, M * V * C, T)
+
         x = self.data_bn(x)
         x = x.view(N * M, V, C, T).permute(0, 2, 3, 1).contiguous()
 

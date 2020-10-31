@@ -1,9 +1,13 @@
-in_path: ..\preprocessed_data\UTD-MHAD\default
+input_data:
+  - path: ..\preprocessed_data\UTD-MHAD\skeleton_default
+    loader: NumpyDatasetLoader
+    loader_args:
+      in_memory: True
+
 out_path: ..\models\agcn\UTD-MHAD
 model: agcn
 dataset: UTD-MHAD
 session_type: training
-loader: loader.SkeletonDataset
 fixed_seed: 1
 
 base_lr: 0.001

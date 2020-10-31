@@ -1,3 +1,11 @@
+"""
+Original code from https://github.com/lshiwjx/2s-AGCN
+
+Lei Shi, Yifan Zhang, Jian Cheng, & Hanqing Lu (2019).
+Two-Stream Adaptive Graph Convolutional Networks for Skeleton-Based Action Recognition.
+In CVPR.
+"""
+
 import math
 
 import numpy as np

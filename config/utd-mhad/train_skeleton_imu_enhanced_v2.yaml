@@ -1,0 +1,32 @@
+# Configuration using Skeleton+IMU data combined
+# IMU signals (e.g. acc, gyro) are appended to the skeleton as additional joints
+# For V2: IMU joints are appended both the right wrist and the right hip
+
+input_data:
+  - path: ..\preprocessed_data\UTD-MHAD\skeleton_imu_enhanced
+    loader: NumpyDatasetLoader
+    loader_args:
+      in_memory: True
+
+out_path: ..\models\agcn\UTD-MHAD
+model: mmagcn
+dataset: UTD-MHAD
+session_type: training
+fixed_seed: 1
+
+mode: skeleton_imu_enhanced
+model_args:
+  num_imu_joints: 2
+  imu_enhanced_mode: append_right
+  right_wrist_joint: 10
+  right_hip_joint: 16
+
+base_lr: 0.001
+optimizer: ADAM
+optimizer_args:
+  weight_decay: 0.01
+
+lr_scheduler: ca
+
+batch_size: 8
+epochs: 50

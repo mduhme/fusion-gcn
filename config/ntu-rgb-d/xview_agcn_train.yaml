@@ -1,6 +1,11 @@
 fixed_seed: 1
 
-in_path: ..\preprocessed_data\NTU-RGB-D\xview
+input_data:
+  - path: ..\preprocessed_data\NTU-RGB-D\xview\skeleton_default
+    loader: NumpyDatasetLoader
+    loader_args:
+      in_memory: True
+
 out_path: ..\models\agcn\NTU-RGB-D\xview
 model: agcn
 dataset: NTU-RGB-D

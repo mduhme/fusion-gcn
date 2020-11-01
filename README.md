@@ -1,14 +1,18 @@
 # Multimodal Action Recognition using Graph Convolutional Neural Networks
 
-When running python processes, working directory should always be the project root directory (where this file lies).
+## Running preprocessing and training
+**When running:**
+- Working directory should always be the project root directory (where this file is located).
+- Running in PyCharm: Mark directory 'torch_src' as *Sources Root*
+- Running in command line: Add root directory to PYTHONPATH
 
 **Right now, everything only tested for UTD-MHAD!**
 
-0. (Optional) Generate Openpose BODY_25 skeletons:  
+0. (Optional) Generate Openpose BODY_25 skeletons from RGB video:  
 Requires Openpose python API created from source to run.
 ```
-./datasets/utd_mhad/gen_openpose_skeletons.py
---in_path <path_to_avi_files>
+./datasets/<dataset>/gen_openpose_skeletons.py
+--in_path <path_to_avi_or_mp4_files>
 --out_path <path_to_store_processed_data>
 --openpose_binary_path <path_to_openpose_binaries>
 --openpose_python_pyth <path_to_openpose_python_files>
@@ -36,3 +40,9 @@ The modality is the prefix (e.g. "rgb_"). Only specify one mode per modality.
 Selected configuration file must refer to the selected mode from preprocessing.
 
 3. Run `./torch_src/main.py` using configuration or command line parameters. View options by running `./torch_src/main.py --help`.
+
+
+## Code
+- Preprocessing related code is found in util.preprocessing and datasets/<dataset>/.
+- torch_src contains the main network implementation.
+- tf_src contains an implementation of AGCN (Two-Stream Adaptive Graph Convolutional Networks for Skeleton-Based Action Recognition) and GCN (Semi-Supervised Classification with Graph Convolutional Networks) in tensorflow.

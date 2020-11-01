@@ -46,3 +46,10 @@ Selected configuration file must refer to the selected mode from preprocessing.
 - Preprocessing related code is found in util.preprocessing and datasets/<dataset>/.
 - torch_src contains the main network implementation.
 - tf_src contains an implementation of AGCN (Two-Stream Adaptive Graph Convolutional Networks for Skeleton-Based Action Recognition) and GCN (Semi-Supervised Classification with Graph Convolutional Networks) in tensorflow.
+
+
+## Model References
+> **GCN**: Kipf, T., & Welling, M. (2017). Semi-Supervised Classification with Graph Convolutional Networks. In International Conference on Learning Representations (ICLR). https://github.com/tkipf/gcn  
+> **AGCN**: Lei Shi, Yifan Zhang, Jian Cheng, & Hanqing Lu (2019). Two-Stream Adaptive Graph Convolutional Networks for Skeleton-Based Action Recognition. In CVPR. https://github.com/lshiwjx/2s-AGCN  
+> **MSG3D**: Liu, Z., Zhang, H., Chen, Z., Wang, Z., & Ouyang, W. (2020). Disentangling and Unifying Graph Convolutions for Skeleton-Based Action Recognition. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (pp. 143–152). https://github.com/kenziyuliu/ms-g3d  
+> Kensho Hara, Hirokatsu Kataoka, & Yutaka Satoh (2018). Can Spatiotemporal 3D CNNs Retrace the History of 2D CNNs and ImageNet?. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR) (pp. 6546–6555). https://github.com/kenshohara/3D-ResNets-PyTorch

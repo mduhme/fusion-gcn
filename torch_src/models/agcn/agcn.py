@@ -136,8 +136,8 @@ class Model(nn.Module):
     def __init__(self, data_shape, num_classes, graph, **kwargs):
         super(Model, self).__init__()
 
-        # data_shape = (num_channels, num_frames, num_joints, num_persons)
-        num_channels, _, num_joints, num_persons = data_shape["skeleton"]
+        # data_shape = (num_persons, num_frames, num_joints, num_channels)
+        num_persons, _, num_joints, num_channels = data_shape["skeleton"]
 
         strategy = GraphPartitionStrategy()
         adj = kwargs.get("adjacency_matrix", None)

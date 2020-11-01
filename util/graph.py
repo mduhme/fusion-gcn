@@ -93,11 +93,10 @@ class Graph:
         if add_self_connections:
             adj = adj + np.eye(self.num_vertices)
         d = np.sum(adj, axis=0)
-        d_inv = np.zeros_like(d)
         if self.is_directed:
-            np.reciprocal(d, out=d_inv, where=d > 0)
+            d_inv = np.reciprocal(d, where=d > 0)
         else:
-            np.reciprocal(np.sqrt(d), out=d_inv, where=d > 0)
+            d_inv = np.reciprocal(np.sqrt(d), where=d > 0)
         d_mat_inv = np.diag(d_inv)
         if self.is_directed:
             return adj.dot(d_mat_inv)

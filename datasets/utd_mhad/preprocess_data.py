@@ -16,8 +16,11 @@ def get_configuration() -> argparse.Namespace:
                         help="UTD-MHAD data parent directory")
     parser.add_argument("-o", "--out_path", default="../preprocessed_data/UTD-MHAD/", type=str,
                         help="Destination directory for processed data.")
-    parser.add_argument("--modes", type=str, help="Modes (comma-separated) to decide how to process the dataset."
-                                                  " See preprocess_data.py:get_preprocessing_setting")
+    parser.add_argument("-m", "--modes", type=str, help="Modes (comma-separated) to decide how to process the dataset."
+                                                        " See preprocess_data.py:get_preprocessing_setting")
+    parser.add_argument("-t", "--target_modality", type=str,
+                        help="Name of a modality. "
+                             "All data is sampled to be of the maximum sequence length of the specified modality.")
     parser.add_argument("--debug", action="store_true", help="debug mode")
     return parser.parse_args()
 
@@ -103,8 +106,8 @@ def preprocess(cf: argparse.Namespace):
 
     # Create features for each modality and write them to files
     # Mode keys are equivalent to processor keys defined above to set the mode for a specific processor
-    multi_modal_data_group.produce_features(splits, processors=processors, modes=processor_modes, out_path=out_path,
-                                            **setting["kwargs"])
+    multi_modal_data_group.produce_features(splits, processors=processors, main_modality=cf.target_modality,
+                                            modes=processor_modes, out_path=out_path, **setting["kwargs"])
 
 
 if __name__ == "__main__":

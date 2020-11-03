@@ -86,8 +86,9 @@ class RGBVideoProcessor(Processor):
 
         if as_numpy:
             out_path += ".npy"
+            target_type = np.float32 if kwargs.get("rgb_normalize_image", False) else self.main_structure.target_type
             shape = [num_samples, self.max_sequence_length, 3, h, w]
-            writer = NumpyWriter(out_path, self.main_structure.target_type, shape)
+            writer = NumpyWriter(out_path, target_type, shape)
             return writer
 
         fps = kwargs["rgb_output_fps"]
@@ -243,6 +244,7 @@ class RGBVideoProcessor(Processor):
         w, h = kwargs["rgb_output_size"]
         rgb_crop_square = kwargs.get("rgb_crop_square", None)
         rgb_resize_interpolation = kwargs.get("rgb_resize_interpolation", None)
+        rgb_normalize_image = kwargs.get("rgb_normalize_image", False)
 
         if rgb_crop_square is None or len(rgb_crop_square) < 4:
             rgb_crop_square = (0, w, 0, h)
@@ -256,14 +258,21 @@ class RGBVideoProcessor(Processor):
             return f
 
         if as_numpy:
-            output_array = np.zeros((self.max_sequence_length, 3, h, w), dtype=self.main_structure.target_type)
+            target_type = np.float32 if rgb_normalize_image else self.main_structure.target_type
+            output_array = np.zeros((self.max_sequence_length, 3, h, w), dtype=target_type)
 
             for frame_idx, frame in enumerate(sample):
                 # frame is shape (h, w, c)
                 frame = transform_frame(frame)
+
+                if rgb_normalize_image and frame.sum() > 0:
+                    mean = np.mean(frame, axis=(0, 1))
+                    std = np.std(frame, axis=(0, 1))
+                    frame = ((frame - mean) / std).astype(np.float32)
+
                 # (h, w, c) to (c, h, w)
                 frame = np.moveaxis(frame, -1, 0)
-                output_array[frame_idx] = transform_frame(frame)
+                output_array[frame_idx] = frame
 
             return output_array
 

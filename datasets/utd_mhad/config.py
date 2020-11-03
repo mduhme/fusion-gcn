@@ -138,9 +138,10 @@ settings = {
             "rgb_crop_square": (100, 480, 100, 480),
 
             # Resize options (Set to desired size or to original size for no resizing)
-            "rgb_output_size": (128, 128),
+            "rgb_output_size": (96, 96),
             "rgb_output_fps": 15,
             "rgb_resize_interpolation": None,  # None = Linear interpolation
+            "rgb_normalize_image": True,  # normalize so that mean=0 and std=1
 
             # True: save numpy array (possibly large), False: encode multiple video files
             "rgb_output_numpy": True,

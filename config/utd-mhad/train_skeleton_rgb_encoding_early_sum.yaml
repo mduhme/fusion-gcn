@@ -1,0 +1,32 @@
+# Create a graph from each individual RGB frame.
+# The RGB frame is first fed to a 2D CNN. The pooled output of that 2D CNN will be used as graph input for AGCN.
+
+input_data:
+  - path: ..\preprocessed_data\UTD-MHAD\skeleton_default__rgb_default
+    loader: NumpyDatasetLoader
+
+out_path: ..\models\agcn\UTD-MHAD
+model: mmagcn
+dataset: UTD-MHAD
+session_type: training
+fixed_seed: 1
+
+mode: skeleton_rgb_encoding_early_fusion
+model_args:
+  fusion: sum
+
+base_lr: 0.001
+optimizer: ADAM
+optimizer_args:
+  weight_decay: 0.01
+
+lr_scheduler: ca
+# lr_scheduler_args:
+#   milestones:
+#     - 10
+#     - 25
+#     - 40
+#   gamma: 0.1
+
+batch_size: 8
+epochs: 50

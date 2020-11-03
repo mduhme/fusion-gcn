@@ -1,0 +1,24 @@
+# Configuration using computing features of extracted RGB patches guided by openpose skeleton keypoints.
+# In this mode, there is a feature vector for each skeleton joint.
+
+input_data:
+  - path: ..\preprocessed_data\UTD-MHAD\rgb_patch_features_op
+    loader: NumpyDatasetLoader
+
+out_path: ..\models\agcn\UTD-MHAD
+model: mmagcn
+dataset: UTD-MHAD
+session_type: training
+fixed_seed: 1
+
+mode: rgb_patch_features
+
+base_lr: 0.001
+optimizer: ADAM
+optimizer_args:
+  weight_decay: 0.01
+
+lr_scheduler: ca
+
+batch_size: 8
+epochs: 50

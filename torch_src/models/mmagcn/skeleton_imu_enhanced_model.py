@@ -4,7 +4,7 @@ import models.mmagcn.agcn as agcn
 
 
 # noinspection PyAbstractClass
-class SkeletonImuEnhanced(nn.Module):
+class SkeletonImuEnhancedModel(nn.Module):
     """
     Take skeleton data with additional joints for each imu modality and append them to different parts of the skeleton.
     """

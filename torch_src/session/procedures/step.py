@@ -50,7 +50,7 @@ class MixedPrecisionStep(Step):
     def forward(self, model: torch.nn.Module, loss_function: torch.nn.Module, features: torch.Tensor,
                 label: torch.Tensor, loss_quotient: int = 1, **kwargs):
         with autocast():
-            self._inner.forward(model, loss_function, features, label, loss_quotient, **kwargs)
+            return self._inner.forward(model, loss_function, features, label, loss_quotient, **kwargs)
 
     def backward(self, loss: torch.Tensor, **kwargs):
         self._loss_scale.scale(loss).backward()

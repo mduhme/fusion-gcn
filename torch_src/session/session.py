@@ -161,8 +161,8 @@ class Session:
 
         for features_batch, label_batch, indices in dataset:
             with torch.no_grad():
-                if type(features_batch) is list:
-                    features = list(map(lambda x: x.float().cuda(), features_batch))
+                if type(features_batch) is dict:
+                    features = {k: v.float().cuda() for k, v in features_batch.items()}
                 else:
                     features = features_batch.float().cuda()
                 label = label_batch.long().cuda()
@@ -186,8 +186,8 @@ class Session:
         model.eval()
         with torch.no_grad():
             for features_batch, label_batch, indices in dataset:
-                if type(features_batch) is list:
-                    features = list(map(lambda x: x.float().cuda(), features_batch))
+                if type(features_batch) is dict:
+                    features = {k: v.float().cuda() for k, v in features_batch.items()}
                 else:
                     features = features_batch.float().cuda()
                 label = label_batch.long().cuda()

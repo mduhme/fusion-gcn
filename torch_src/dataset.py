@@ -44,7 +44,7 @@ class MultiModalDataset(Dataset):
             loader, data = next(iter(self.features_data.values()))
             features = loader.index_data_sample(data, index)
         else:
-            features = {k: loader.index_data_sample(data, index) for k, (loader, data) in self.features_data}
+            features = {k: loader.index_data_sample(data, index) for k, (loader, data) in self.features_data.items()}
         label = self.labels_data[index]
         return features, label, index
 

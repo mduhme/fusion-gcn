@@ -3,11 +3,10 @@ from typing import Dict, Union
 
 import torch
 
-from session.procedures.serializer import StateDictSerializer
 from session.procedures.step import Step, DefaultStep, MixedPrecisionStep
 
 
-class BatchProcessor(StateDictSerializer):
+class BatchProcessor:
     def __init__(self, step_function: Step):
         self._step_function = step_function
 

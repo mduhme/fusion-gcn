@@ -3,10 +3,8 @@ import abc
 import torch
 from torch.cuda.amp import autocast, GradScaler
 
-from session.procedures.serializer import StateDictSerializer
 
-
-class Step(StateDictSerializer):
+class Step:
     @abc.abstractmethod
     def forward(self, model: torch.nn.Module, loss_function: torch.nn.Module, features: torch.Tensor,
                 label: torch.Tensor, loss_quotient: int = 1, **kwargs):
@@ -22,6 +20,9 @@ class Step(StateDictSerializer):
 
     @abc.abstractmethod
     def reset(self):
+        pass
+
+    def get_state_dict_objects(self, object_container: dict):
         pass
 
 

@@ -1,4 +1,5 @@
 import abc
+from typing import Dict, Union
 
 import torch
 
@@ -32,14 +33,18 @@ class DefaultBatchProcessor(BatchProcessor):
     def __init__(self, step_function: Step):
         super().__init__(step_function)
 
-    def process_single_batch(self, model: torch.nn.Module, loss_function: torch.nn.Module, features: torch.Tensor,
-                             label: torch.Tensor, update_metrics_function=None):
+    def process_single_batch(self,
+                             model: torch.nn.Module,
+                             loss_function: torch.nn.Module,
+                             features: Union[torch.Tensor, Dict[str, torch.Tensor]],
+                             label: torch.Tensor,
+                             update_metrics_function=None):
         """
         Compute and calculate the loss for a single batch. If training, propagate the loss to all parameters.
 
         :param model: model to train/evaluate
         :param loss_function: function to compute loss
-        :param features: features tensor of len batch_size
+        :param features: features tensor of len batch_size or multiple tensors in a dictionary, one for each modality
         :param label: label tensor of len batch_size
         :param update_metrics_function: If not None: function that takes
          (loss, (y_pred, y_true), len(y_true)) to update metrics
@@ -61,15 +66,19 @@ class GradientAccumulationBatchProcessor(BatchProcessor):
         self._steps = batch_size // gradient_accumulation_batch_size
         self._gradient_accumulation_batch_size = gradient_accumulation_batch_size
 
-    def process_single_batch(self, model: torch.nn.Module, loss_function: torch.nn.Module, features: torch.Tensor,
-                             label: torch.Tensor, update_metrics_function=None):
+    def process_single_batch(self,
+                             model: torch.nn.Module,
+                             loss_function: torch.nn.Module,
+                             features: Union[torch.Tensor, Dict[str, torch.Tensor]],
+                             label: torch.Tensor,
+                             update_metrics_function=None):
         """
         Compute and calculate the loss for a single batch in small steps using gradient accumulation.
         If training, propagate the loss to all parameters.
 
         :param model: model to train/evaluate
         :param loss_function:  function to compute loss
-        :param features: features tensor of len batch_size
+        :param features: features tensor of len batch_size or multiple tensors in a dictionary, one for each modality
         :param label: label tensor of len batch_size
         :param update_metrics_function: If not None: function that takes
          (loss, (y_pred, y_true), len(y_true)) to update metrics
@@ -78,7 +87,11 @@ class GradientAccumulationBatchProcessor(BatchProcessor):
         for step in range(self._steps):
             start = step * self._gradient_accumulation_batch_size
             end = start + self._gradient_accumulation_batch_size
-            x, y_true = features[start:end], label[start:end]
+            y_true = label[start:end]
+            if type(features) is dict:
+                x = {k: v[start:end] for k, v in features.items()}
+            else:
+                x = features[start:end]
             y_pred, loss = self._step_function.forward(model, loss_function, x, y_true, loss_quotient=len(y_true))
 
             if model.training:

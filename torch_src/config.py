@@ -86,9 +86,8 @@ def get_configuration(session_types: tuple, optimizer_choices: tuple,
                         help="Specify which dataset constants to load from the 'datasets' subdirectory.")
     parser.add_argument("-s", "--session_type", type=str, choices=session_types,
                         help="Session type: Training or Evaluation.")
-    parser.add_argument("-i", "--input_data", type=str, help="Comma separated list to input data paths. "
-                                                             "Each path will use the default numpy loader. "
-                                                             "For specific loader use configuration file.")
+    parser.add_argument("-i", "--input_data", type=str,
+                        help="Input data path. For multiple inputs or specific loader use configuration file.")
     parser.add_argument("-o", "--out_path", type=str,
                         help="Path where trained models temporary results / checkpoints will be stored")
     parser.add_argument("--base_lr", type=float, help="Initial learning rate")

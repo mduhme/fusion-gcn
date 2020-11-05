@@ -9,7 +9,6 @@ from models.mmagcn.fusion import get_fusion
 from util.graph import Graph
 
 
-# noinspection PyAbstractClass
 class RgbPatchFeaturesModel(nn.Module):
     """
     Input data comes in form of precomputed features of extracted RGB patches for each frame.
@@ -26,7 +25,7 @@ class RgbPatchFeaturesModel(nn.Module):
         return self.agcn(x)
 
 
-# noinspection PyAbstractClass,PyUnusedLocal
+# noinspection PyUnusedLocal
 class RgbPatchGroupsFeaturesModel(nn.Module):
     """
     Take skeleton data with additional joints for each imu modality and append them to different parts of the skeleton.
@@ -46,7 +45,6 @@ class RgbPatchGroupsFeaturesModel(nn.Module):
         return self.agcn(x)
 
 
-# noinspection PyAbstractClass
 class RgbEncoder(nn.Module):
     def __init__(self, **kwargs):
         super().__init__()
@@ -58,12 +56,6 @@ class RgbEncoder(nn.Module):
         torch.hub.set_dir(torch_hub)
         cnn = models.resnet18(pretrained=True)
         fc_input_size = 512
-
-        if kwargs.get("modify_resnet", False):
-            # cnn.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-            # cnn.maxpool = None
-            cnn.layer4 = None
-            fc_input_size = 256
 
         layers_without_fc = list(cnn.children())[:-1]
         rgb_node_encoding_feature_dim = self.num_bodies * self.num_vertices * self.num_encoded_channels
@@ -83,7 +75,6 @@ class RgbEncoder(nn.Module):
         return y
 
 
-# noinspection PyAbstractClass,DuplicatedCode
 class RgbEncoderModel(nn.Module):
     def __init__(self, data_shape, num_classes: int, graph, **kwargs):
         super().__init__()
@@ -99,37 +90,3 @@ class RgbEncoderModel(nn.Module):
         x = self.rgb_encoder(x)
         x = self.agcn(x)
         return x
-
-
-# noinspection PyAbstractClass
-class SkeletonRgbEncodingEarlyFusion(nn.Module):
-    def __init__(self, data_shape, num_classes: int, graph, **kwargs):
-        super().__init__()
-        num_layers = kwargs.get("num_layers", 10)
-        self._fusion_type = kwargs.get("fusion", "concatenate")
-
-        self.rgb_encoder = RgbEncoder(rgb_num_vertices=graph.num_vertices, **kwargs)
-
-        if self._fusion_type == "concatenate":
-            num_channels = data_shape["skeleton"][-1] + self.rgb_encoder.num_encoded_channels
-        else:
-            num_channels = data_shape["skeleton"][-1]
-
-        agcn_input_shape = (self.rgb_encoder.num_bodies, data_shape["rgb"][0], self.rgb_encoder.num_vertices,
-                            num_channels)
-        self.agcn = agcn.Model(agcn_input_shape, num_classes, graph, num_layers=num_layers)
-        self._fusion = get_fusion(self._fusion_type, concatenate_dim=-1)
-
-    def forward(self, x):
-        skeleton_data = x["skeleton"]
-        rgb_data = x["rgb"]
-
-        # Encode RGB images
-        rgb_data = self.rgb_encoder(rgb_data)
-
-        # Early fusion of skeleton and rgb
-        fused_data = self._fusion.combine(skeleton_data, rgb_data)
-
-        # Run graph convolutional neural network
-        y = self.agcn(fused_data)
-        return y

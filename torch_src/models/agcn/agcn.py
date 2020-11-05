@@ -131,7 +131,6 @@ class TCN_GCN_unit(nn.Module):
         return self.relu(x)
 
 
-# noinspection PyAbstractClass
 class Model(nn.Module):
     def __init__(self, data_shape, num_classes, graph, **kwargs):
         super(Model, self).__init__()

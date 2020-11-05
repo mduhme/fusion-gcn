@@ -174,10 +174,6 @@ class ProgressLogger:
         # Write metrics to tensorboard
         for metric in metrics.get_metrics():
             self._summary.add_scalar(metric.name, metric.value, self._current_epoch)
-        for group_name, metric_list in metrics.get_related_metrics().items():
-            self._summary.add_scalars("Summary/" + group_name, {
-                metrics[m].name: metrics[m].value for m in metric_list
-            }, self._current_epoch)
 
     def update_epoch_mode(self, mode: int, n: int = 1, metrics: str = None):
         self._modes_steps[mode] += n

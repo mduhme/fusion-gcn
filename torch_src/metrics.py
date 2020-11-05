@@ -1,36 +1,57 @@
-from abc import abstractmethod
-from typing import Union, Sequence, List, Dict
+"""
+Different types of metrics which appear in log or tensorboard.
+Some code is taken and modified from ignite.metrics library.
+"""
 
+from abc import ABC, abstractmethod
+from typing import Dict, List, Optional, Sequence, Union
+
+import matplotlib.pyplot as plt
 import torch
+from torch.utils.tensorboard import SummaryWriter
 
 
-class Metric:
+class Metric(ABC):
     def __init__(self, name: str):
         self.name = name
 
     @abstractmethod
-    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None):
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
         pass
 
     @property
     @abstractmethod
-    def value(self) -> float:
+    def value(self):
         pass
 
     @abstractmethod
     def reset(self):
         pass
 
+    @abstractmethod
+    def to_summary(self, summary: SummaryWriter, epoch: int):
+        pass
+
     def __str__(self):
         return f"{self.name}: {self.value:.4f}"
 
 
-class SimpleMetric(Metric):
+class ScalarMetric(Metric, ABC):
+    @property
+    @abstractmethod
+    def value(self) -> float:
+        pass
+
+    def to_summary(self, summary: SummaryWriter, epoch: int):
+        summary.add_scalar(self.name, self.value, epoch)
+
+
+class SimpleMetric(ScalarMetric):
     def __init__(self, name: str):
         super().__init__(name)
         self.val = 0.
 
-    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None):
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
         self.val = val
 
     @property
@@ -41,13 +62,13 @@ class SimpleMetric(Metric):
         self.val = 0.
 
 
-class Mean(Metric):
+class Mean(ScalarMetric):
     def __init__(self, name: str = "mean"):
         super().__init__(name)
         self._sum = 0.
         self._steps = 0
 
-    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None):
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
         self._sum += val.item() * n
         self._steps += n
 
@@ -60,13 +81,13 @@ class Mean(Metric):
         self._steps = 0
 
 
-class MultiClassAccuracy(Metric):
+class MultiClassAccuracy(ScalarMetric):
     def __init__(self, name: str = "accuracy"):
         super().__init__(name)
         self._num_correct = 0.
         self._num_examples = 0
 
-    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None):
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
         y_pred, y_true = val
         indices = torch.argmax(y_pred, dim=1)
         correct = torch.eq(indices, y_true).view(-1)
@@ -83,14 +104,14 @@ class MultiClassAccuracy(Metric):
         self._num_examples = 0
 
 
-class TopKAccuracy(Metric):
+class TopKAccuracy(ScalarMetric):
     def __init__(self, name: str = "top-k-accuracy", k: int = 5):
         super().__init__(name)
         self._k = k
         self._num_correct = 0.
         self._num_examples = 0
 
-    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None):
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
         y_pred, y_true = val
         sorted_indices = torch.topk(y_pred, self._k, dim=1)[1]
         expanded_y = y_true.view(-1, 1).expand(-1, self._k)
@@ -112,10 +133,9 @@ class MetricsContainer:
     Utility class to store, update and format multiple metrics and distinguish between training and validation metrics.
     """
 
-    def __init__(self, metrics: list, related_metrics: Dict[str, Sequence[str]] = None):
+    def __init__(self, metrics: list):
         """
         :param metrics: List of metrics. Will be split into training and validation metrics based on their name.
-        :param related_metrics: Dictionary of lists of related metrics. Key is the group name.
         Each list of related metrics will be shown together in an additional tensorboard plot.
         """
         self._metrics = metrics
@@ -133,10 +153,11 @@ class MetricsContainer:
             self.training_loss = Mean("training_loss")
             self._metrics = [self.training_loss] + self._metrics
 
-        self._training_format_metrics = [self.training_loss] + self._training_metrics
-        self._validation_format_metrics = [self.validation_loss] + self._validation_metrics
+        self._training_format_metrics = [self.training_loss] + [m for m in self._training_metrics if
+                                                                isinstance(m, ScalarMetric)]
+        self._validation_format_metrics = [self.validation_loss] + [m for m in self._validation_metrics if
+                                                                    isinstance(m, ScalarMetric)]
         self._metrics_dict = {m.name: m for m in self._metrics}
-        self._related_metrics = related_metrics or {}
         self._history = {}
 
     def __getitem__(self, item):
@@ -158,13 +179,6 @@ class MetricsContainer:
         :return: List of metrics
         """
         return self._metrics
-
-    def get_related_metrics(self) -> Dict[str, Sequence[str]]:
-        """
-        :return: List of lists of related metrics.
-        Each list of related metrics will be shown together in an additional tensorboard plot.
-        """
-        return self._related_metrics
 
     def _save_metrics(self):
         """
@@ -198,7 +212,7 @@ class MetricsContainer:
         """
         self.training_loss.update(loss, n)
         for m in self._training_metrics:
-            m.update(output, n)
+            m.update(output, n, "train")
 
     def update_validation(self, loss: torch.Tensor, output: Sequence[torch.Tensor], n: int):
         """
@@ -209,7 +223,7 @@ class MetricsContainer:
         """
         self.validation_loss.update(loss, n)
         for m in self._validation_metrics:
-            m.update(output, n)
+            m.update(output, n, "val")
 
     def format_training(self) -> str:
         """

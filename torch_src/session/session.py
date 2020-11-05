@@ -131,25 +131,19 @@ class Session:
             MultiClassAccuracy("training_accuracy"),
             MultiClassAccuracy("validation_accuracy")
         ]
-        related_metrics = {
-            "loss": ["lr", "training_loss", "validation_loss"],
-            "accuracy": ["lr", "training_accuracy", "validation_accuracy"]
-        }
 
         if k > 1:
             metrics_list.append(TopKAccuracy(f"training_top{k}_accuracy", k=k))
             metrics_list.append(TopKAccuracy(f"validation_top{k}_accuracy", k=k))
-            related_metrics[f"top{k}_accuracy"] = ["lr", f"training_top{k}_accuracy", f"validation_top{k}_accuracy"]
 
         if additional_metrics:
             for metric_name in additional_metrics:
                 c = additional_metrics[metric_name]
                 metrics_list.append(c(f"training_{metric_name}"))
                 metrics_list.append(c(f"validation_{metric_name}"))
-                related_metrics[metric_name] = ["lr", f"training_{metric_name}", f"validation_{metric_name}"]
 
         metrics_list.append(SimpleMetric("lr"))
-        return MetricsContainer(metrics_list, related_metrics)
+        return MetricsContainer(metrics_list)
 
     @staticmethod
     def train_epoch(batch_processor: BatchProcessor, model: torch.nn.Module, loss_function: torch.nn.Module,

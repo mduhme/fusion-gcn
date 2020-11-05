@@ -35,7 +35,6 @@ def bn_init(bn, scale):
     nn.init.constant_(bn.bias, 0)
 
 
-# noinspection PyAbstractClass
 class TemporalConv(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, kernel_size: int = 9, stride: int = 1):
         super().__init__()
@@ -53,7 +52,6 @@ class TemporalConv(nn.Module):
         return x
 
 
-# noinspection PyAbstractClass
 class SpatialGraphConv(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, adj: np.ndarray, coff_embedding: int = 4,
                  num_subsets: int = 3):
@@ -114,7 +112,6 @@ class SpatialGraphConv(nn.Module):
         return self.relu(y)
 
 
-# noinspection PyAbstractClass
 class SpatialTemporalConv(nn.Module):
     def __init__(self, in_channels, out_channels, adj, stride=1, residual=True):
         super().__init__()
@@ -136,7 +133,6 @@ class SpatialTemporalConv(nn.Module):
         return self.relu(x)
 
 
-# noinspection PyAbstractClass
 class Model(nn.Module):
     def __init__(self, data_shape: tuple, num_classes: int, graph, num_layers: int = 10, start_feature_size: int = 64,
                  without_fc=False, dropout: float = 0.):

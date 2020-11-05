@@ -4,7 +4,6 @@ import models.mmagcn.rgb_features_model as rgb_models
 from models.mmagcn.skeleton_imu_enhanced_model import SkeletonImuEnhancedModel
 
 
-# noinspection PyAbstractClass
 class Model(nn.Module):
     def __init__(self, data_shape, num_classes: int, graph, mode: str, **kwargs):
         super().__init__()

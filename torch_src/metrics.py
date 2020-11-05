@@ -128,6 +128,68 @@ class TopKAccuracy(ScalarMetric):
         self._num_examples = 0
 
 
+class VisualMetric(Metric, ABC):
+    @abstractmethod
+    def get_figure(self) -> plt.Figure:
+        pass
+
+    def to_summary(self, summary: SummaryWriter, epoch: int):
+        summary.add_figure("", self.get_figure(), epoch)
+
+
+class ConfusionMatrix(VisualMetric):
+    def __init__(self, num_classes: int, name: str = "confusion-matrix", mode: Optional[str] = None,
+                 class_labels: Optional[Sequence[str]] = None):
+        super().__init__(name)
+        assert class_labels is None or len(class_labels) == num_classes
+        self.num_classes = num_classes
+        self.mode = mode
+        self.class_labels = class_labels
+        self.confusion_matrix = torch.zeros(self.num_classes, self.num_classes, dtype=torch.int32)
+        self._num_samples = 0
+
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
+        y_pred, y_true = val
+        self._num_samples += len(y_pred)
+        y_pred = torch.argmax(y_pred, dim=1)
+        matrix_indices = self.num_classes * y_true + y_pred
+        m = torch.bincount(matrix_indices, minlength=self.num_classes**2).reshape(self.num_classes, self.num_classes)
+        self.confusion_matrix += m.to(self.confusion_matrix)
+
+    @property
+    def value(self):
+        if self.mode == "accuracy":
+            return self.confusion_matrix / self._num_samples
+        elif self.mode == "recall":
+            pass
+        elif self.mode == "precision":
+            pass
+
+        return self.confusion_matrix
+
+    def reset(self):
+        self.confusion_matrix = torch.zeros(self.num_classes, self.num_classes, dtype=torch.int32)
+        self._num_samples = 0
+
+    def get_figure(self) -> plt.Figure:
+        pass
+
+
+class AccuracyBarChart(VisualMetric):
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
+        pass
+
+    @property
+    def value(self):
+        pass
+
+    def reset(self):
+        pass
+
+    def get_figure(self) -> plt.Figure:
+        pass
+
+
 class MetricsContainer:
     """
     Utility class to store, update and format multiple metrics and distinguish between training and validation metrics.

@@ -1,7 +1,8 @@
 import torch.nn as nn
 
-import models.mmagcn.rgb_features_model as rgb_models
-from models.mmagcn.skeleton_imu_enhanced_model import SkeletonImuEnhancedModel
+import models.mmagcn.imu_feature_models as imu_models
+import models.mmagcn.rgb_feature_models as rgb_models
+import models.mmagcn.skeleton_graph_fusion_models as skeleton_graph_fusion_models
 
 
 class Model(nn.Module):
@@ -17,24 +18,30 @@ class Model(nn.Module):
             "rgb_encoder_model": rgb_models.RgbEncoderModel,
 
             # ------------------------------------------------------
+            # ----------------       IMU ONLY       ----------------
+            # ------------------------------------------------------
+            "imu_gcn": imu_models.ImuGCN,
+
+            # ------------------------------------------------------
             # ----------------    SKELETON + RGB    ----------------
             # ------------------------------------------------------
-            "skeleton_rgb_encoding_early_fusion": rgb_models.SkeletonRgbEncodingEarlyFusion,
+            "skeleton_rgb_encoding_early_fusion": skeleton_graph_fusion_models.SkeletonRgbEarlyFusion,
 
             # ------------------------------------------------------
             # ----------------    SKELETON + IMU    ----------------
             # ------------------------------------------------------
-            "skeleton_imu_enhanced": SkeletonImuEnhancedModel,
+            "skeleton_imu_enhanced": skeleton_graph_fusion_models.SkeletonImuEnhancedModel,
 
             # ------------------------------------------------------
             # ---------------- SKELETON + RGB + IMU ----------------
             # ------------------------------------------------------
+            "skeleton_imu_rgb_graph_early_fusion": skeleton_graph_fusion_models.SkeletonImuRgbEarlyFusion
         }
 
         if mode not in modes:
             raise ValueError("Unsupported mode: " + mode)
 
-        self._model = modes[mode](data_shape, num_classes, graph, **kwargs)
+        self._model = modes[mode](data_shape, num_classes, graph=graph, **kwargs)
 
     def forward(self, x):
         return self._model(x)

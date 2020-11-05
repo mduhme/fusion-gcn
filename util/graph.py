@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
+import scipy.sparse as sp
 
 
 class Graph:
@@ -20,8 +21,6 @@ class Graph:
             self.num_vertices = num_vertices
         self.__g = nx.Graph() if not is_directed else nx.DiGraph()
         self.__g.add_edges_from(self.edges)
-        self.__a = None  # adjacency matrix
-        self.__d = None  # degree matrix
         self.is_directed = is_directed
         self.center_joint = center_joint
 
@@ -73,31 +72,56 @@ class Graph:
         return Graph(np.delete(self.edges, np.where(self.__is_one_of(edges)), axis=0), center_joint=self.center_joint)
 
     def get_adjacency_matrix(self):
-        if self.__a is None:
-            a = np.zeros((self.num_vertices, self.num_vertices), dtype=np.int)
-            a[self.edges[:, 0], self.edges[:, 1]] = 1
-            if not self.is_directed:
-                a[self.edges[:, 1], self.edges[:, 0]] = 1
-            self.__a = a
-        return self.__a
+        a = np.zeros((self.num_vertices, self.num_vertices), dtype=np.int)
+        a[self.edges[:, 0], self.edges[:, 1]] = 1
+        if not self.is_directed:
+            a[self.edges[:, 1], self.edges[:, 0]] = 1
+        return a
+
+    def get_sparse_adjacency_matrix(self):
+        data = np.ones(len(self.edges) * 2)
+        e1 = self.edges[:, 0]
+        e2 = self.edges[:, 1]
+        if not self.is_directed:
+            e1 = np.hstack((e1, self.edges[:, 1]))
+            e2 = np.hstack((e2, self.edges[:, 0]))
+        a = sp.coo_matrix((data, (e1, e2)), shape=(self.num_vertices, self.num_vertices), dtype=np.int)
+        return a
 
     def get_degree_matrix(self, as_matrix=True):
-        if self.__d is None:
-            self.__d = np.sum(self.get_adjacency_matrix(), axis=0)
+        d = np.sum(self.get_adjacency_matrix(), axis=0)
         if as_matrix:
-            return np.diag(self.__d)
-        return self.__d
+            return np.diag(d)
+        return d
+
+    def _reciprocal_degree(self, degree: np.ndarray) -> np.ndarray:
+        if self.is_directed:
+            return np.reciprocal(degree, where=degree > 0)
+        return np.reciprocal(np.sqrt(degree), where=degree > 0)
 
     def get_normalized_adjacency_matrix(self, add_self_connections=False):
         adj = self.get_adjacency_matrix().astype(np.float)
         if add_self_connections:
-            adj = adj + np.eye(self.num_vertices)
+            adj += np.eye(self.num_vertices)
+
         d = np.sum(adj, axis=0)
-        if self.is_directed:
-            d_inv = np.reciprocal(d, where=d > 0)
-        else:
-            d_inv = np.reciprocal(np.sqrt(d), where=d > 0)
+        d_inv = self._reciprocal_degree(d)
         d_mat_inv = np.diag(d_inv)
+
+        if self.is_directed:
+            return adj.dot(d_mat_inv)
+        return adj.dot(d_mat_inv).transpose().dot(d_mat_inv)
+
+    def get_normalized_sparse_adjacency_matrix(self, add_self_connections=False):
+        adj = self.get_sparse_adjacency_matrix().astype(np.float)
+        if add_self_connections:
+            adj += sp.eye(self.num_vertices)
+
+        # noinspection PyUnresolvedReferences
+        d = adj.sum(axis=0).A1
+        d_inv = self._reciprocal_degree(d)
+        d_mat_inv = sp.diags(d_inv)
+
         if self.is_directed:
             return adj.dot(d_mat_inv)
         return adj.dot(d_mat_inv).transpose().dot(d_mat_inv)
@@ -142,29 +166,12 @@ class Graph:
                f"{self.get_laplacian_matrix()}\n"
 
 
-def normalize_adjacency_matrix_undirected(adj: np.ndarray) -> np.ndarray:
-    adj = adj.astype(np.float) + np.eye(adj.shape[0])
-    d = np.sum(adj, axis=0)
-    d_inv_sqrt = np.power(d, -0.5)
-    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.
-    d_mat_inv_sqrt = np.diag(d_inv_sqrt)
-    return adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt)
-
-
-def normalize_adjacency_matrix_directed(adj: np.ndarray) -> np.ndarray:
-    adj = adj.astype(np.float) + np.eye(adj.shape[0])
-    d = np.sum(adj, axis=0)
-    d_inv_sqrt = np.power(d, -1)
-    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.
-    return adj.dot(np.diag(d_inv_sqrt))
-
-
 def get_k_adjacency(adj: np.ndarray, k: int, with_self: bool = False, self_factor: int = 1) -> np.ndarray:
     identity = np.eye(len(adj), dtype=adj.dtype)
     if k == 0:
         return identity
-    adj_k = np.minimum(np.linalg.matrix_power(adj + identity, k), 1) - \
-            np.minimum(np.linalg.matrix_power(adj + identity, k - 1), 1)
+    adj_k = np.minimum(np.linalg.matrix_power(adj + identity, k), 1) - np.minimum(
+        np.linalg.matrix_power(adj + identity, k - 1), 1)
     if with_self:
         adj_k += (self_factor * identity)
     return adj_k

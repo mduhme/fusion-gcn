@@ -4,6 +4,8 @@ import inspect
 
 import torch
 
+from util.graph import Graph
+
 
 class Fusion:
     @abc.abstractmethod
@@ -43,3 +45,30 @@ def get_fusion(fusion_type: str, **kwargs) -> Fusion:
     kwargs = {k: v for k, v in kwargs.items() if k in args}
 
     return fusion_types[fusion_type](**kwargs)
+
+
+def get_skeleton_imu_fusion_graph(skeleton_graph: Graph, imu_enhanced_mode: str, num_imu_joints: int, **kwargs):
+    # create new edges for imu data
+    new_edges = []
+    if imu_enhanced_mode == "append_center":
+        # append imu joints to skeleton center joint
+        center_joint = kwargs.get("center_joint", skeleton_graph.center_joint)
+        new_edges.extend((skeleton_graph.num_vertices + i, center_joint) for i in range(num_imu_joints))
+
+    elif imu_enhanced_mode == "append_right":
+        # append imu joints to skeleton right wrist and right hip
+        right_wrist_joint = kwargs["right_wrist_joint"]
+        right_hip_joint = kwargs["right_hip_joint"]
+        for i in range(num_imu_joints):
+            new_edges.append((skeleton_graph.num_vertices + i, right_wrist_joint))
+            new_edges.append((skeleton_graph.num_vertices + i, right_hip_joint))
+
+    else:
+        raise ValueError("Unsupported imu_enhanced_mode: " + imu_enhanced_mode)
+
+    if kwargs.get("interconnect_imu_joints", False):
+        for i in range(num_imu_joints):
+            for j in range(i + 1, num_imu_joints):
+                new_edges.append((skeleton_graph.num_vertices + i, skeleton_graph.num_vertices + j))
+
+    return skeleton_graph.with_new_edges(new_edges)

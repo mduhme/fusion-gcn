@@ -5,7 +5,6 @@ import torch.nn as nn
 import torchvision.models as models
 
 import models.mmagcn.agcn as agcn
-from models.mmagcn.fusion import get_fusion
 from util.graph import Graph
 
 

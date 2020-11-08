@@ -40,8 +40,8 @@ class GraphPartitionStrategy:
             # The third matrix stores outgoing connections, so A[0, 1] > 1, the opposite from the second matrix.
             a = np.empty((3, graph.num_vertices, graph.num_vertices))
             a[0] = np.eye(graph.num_vertices)
-            a[1] = graph.as_directed().with_reversed_edges().get_normalized_adjacency_matrix()
-            a[2] = graph.as_directed().get_normalized_adjacency_matrix()
+            a[1] = graph.as_directed().with_reversed_edges().get_normalized_adjacency_matrix(normalization="column")
+            a[2] = graph.as_directed().get_normalized_adjacency_matrix(normalization="column")
             return a
 
         # Uniform / Uni-labeling strategy (K = 1):

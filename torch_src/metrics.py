@@ -7,13 +7,17 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Sequence, Union
 
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
+
+import util.visualization.confusion_matrix as cnf_vis
 
 
 class Metric(ABC):
     def __init__(self, name: str):
         self.name = name
+        self.write_to_summary_interval = 1
 
     @abstractmethod
     def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
@@ -28,8 +32,12 @@ class Metric(ABC):
     def reset(self):
         pass
 
-    @abstractmethod
     def to_summary(self, summary: SummaryWriter, epoch: int):
+        if self.write_to_summary_interval > 0 and epoch % self.write_to_summary_interval == 0:
+            self._to_summary(summary, epoch)
+
+    @abstractmethod
+    def _to_summary(self, summary: SummaryWriter, epoch: int):
         pass
 
     def __str__(self):
@@ -37,12 +45,16 @@ class Metric(ABC):
 
 
 class ScalarMetric(Metric, ABC):
+    def __init__(self, name: str):
+        super().__init__(name)
+        self.show_in_progress_log = True
+
     @property
     @abstractmethod
     def value(self) -> float:
         pass
 
-    def to_summary(self, summary: SummaryWriter, epoch: int):
+    def _to_summary(self, summary: SummaryWriter, epoch: int):
         summary.add_scalar(self.name, self.value, epoch)
 
 
@@ -91,7 +103,6 @@ class MultiClassAccuracy(ScalarMetric):
         y_pred, y_true = val
         indices = torch.argmax(y_pred, dim=1)
         correct = torch.eq(indices, y_true).view(-1)
-
         self._num_correct += torch.sum(correct).item()
         self._num_examples += correct.shape[0]
 
@@ -128,13 +139,15 @@ class TopKAccuracy(ScalarMetric):
         self._num_examples = 0
 
 
-class VisualMetric(Metric, ABC):
+class VisualMetric(Metric):
     @abstractmethod
     def get_figure(self) -> plt.Figure:
         pass
 
-    def to_summary(self, summary: SummaryWriter, epoch: int):
-        summary.add_figure("", self.get_figure(), epoch)
+    def _to_summary(self, summary: SummaryWriter, epoch: int):
+        fig = self.get_figure()
+        summary.add_figure(self.name, fig, epoch)
+        plt.close(fig)
 
 
 class ConfusionMatrix(VisualMetric):
@@ -153,17 +166,17 @@ class ConfusionMatrix(VisualMetric):
         self._num_samples += len(y_pred)
         y_pred = torch.argmax(y_pred, dim=1)
         matrix_indices = self.num_classes * y_true + y_pred
-        m = torch.bincount(matrix_indices, minlength=self.num_classes**2).reshape(self.num_classes, self.num_classes)
+        m = torch.bincount(matrix_indices, minlength=self.num_classes ** 2).reshape(self.num_classes, self.num_classes)
         self.confusion_matrix += m.to(self.confusion_matrix)
 
     @property
     def value(self):
-        if self.mode == "accuracy":
-            return self.confusion_matrix / self._num_samples
+        if self.mode == "samples":
+            return self.confusion_matrix.to(torch.float) / self._num_samples
         elif self.mode == "recall":
-            pass
+            return self.confusion_matrix.to(torch.float) / (self.confusion_matrix.sum(dim=1).unsqueeze(1) + 1e-15)
         elif self.mode == "precision":
-            pass
+            return self.confusion_matrix.to(torch.float) / (self.confusion_matrix.sum(dim=0) + 1e-15)
 
         return self.confusion_matrix
 
@@ -172,22 +185,39 @@ class ConfusionMatrix(VisualMetric):
         self._num_samples = 0
 
     def get_figure(self) -> plt.Figure:
-        pass
+        return cnf_vis.create_figure(self.value.numpy(), self.class_labels)
 
 
 class AccuracyBarChart(VisualMetric):
+    def __init__(self, num_classes: int, name: str = "bar-chart", class_labels: Optional[Sequence[str]] = None):
+        super().__init__(name)
+        assert class_labels is None or len(class_labels) == num_classes
+        self.num_classes = num_classes
+        self.class_labels = class_labels
+        self.bins = None
+        self.reset()
+
     def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
-        pass
+        self.bins[context].update(val, n, context)
 
     @property
     def value(self):
-        pass
+        acc = {
+            k: torch.diagonal(v.value).float() / v.value.sum(dim=0)
+            for k, v in self.bins.items()
+        }
+        return acc
 
     def reset(self):
-        pass
+        self.bins = {
+            "train": ConfusionMatrix(self.num_classes, "train", class_labels=self.class_labels),
+            "val": ConfusionMatrix(self.num_classes, "val", class_labels=self.class_labels)
+        }
 
     def get_figure(self) -> plt.Figure:
-        pass
+        return cnf_vis.create_bar_chart({k: v.numpy() for k, v in self.value.items()}, self.class_labels, [
+            "Accuracy (Training)", "Accuracy (Validation)"
+        ])
 
 
 class MetricsContainer:
@@ -215,12 +245,15 @@ class MetricsContainer:
             self.training_loss = Mean("training_loss")
             self._metrics = [self.training_loss] + self._metrics
 
-        self._training_format_metrics = [self.training_loss] + [m for m in self._training_metrics if
-                                                                isinstance(m, ScalarMetric)]
-        self._validation_format_metrics = [self.validation_loss] + [m for m in self._validation_metrics if
-                                                                    isinstance(m, ScalarMetric)]
+        self._training_format_metrics = MetricsContainer._log_metrics(self.training_loss, *self._training_metrics)
+        self._validation_format_metrics = MetricsContainer._log_metrics(self.validation_loss, *self._validation_metrics)
+        self._progress_metrics = MetricsContainer._log_metrics(*self._metrics)
         self._metrics_dict = {m.name: m for m in self._metrics}
         self._history = {}
+
+    @staticmethod
+    def _log_metrics(*metrics) -> list:
+        return [m for m in metrics if isinstance(m, ScalarMetric) and m.show_in_progress_log]
 
     def __getitem__(self, item):
         """
@@ -241,6 +274,16 @@ class MetricsContainer:
         :return: List of metrics
         """
         return self._metrics
+
+    def to_summary(self, summary: SummaryWriter, epoch: int):
+        """
+        Writes all metrics to the summary.
+
+        :param summary: summary writer
+        :param epoch: current epoch
+        """
+        for metric in self._metrics:
+            metric.to_summary(summary, epoch)
 
     def _save_metrics(self):
         """
@@ -303,7 +346,7 @@ class MetricsContainer:
         """
         :return: All metrics and their values as a string.
         """
-        return MetricsContainer.format(self._metrics)
+        return MetricsContainer.format(self._progress_metrics)
 
     @staticmethod
     def format(metrics: Sequence[Metric]) -> str:

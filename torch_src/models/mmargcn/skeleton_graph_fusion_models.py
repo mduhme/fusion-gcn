@@ -1,8 +1,8 @@
 import torch.nn as nn
 
-import models.mmagcn.agcn as agcn
-from models.mmagcn.fusion import get_fusion, get_skeleton_imu_fusion_graph
-from models.mmagcn.rgb_feature_models import RgbEncoder
+import models.mmargcn.agcn as agcn
+from models.mmargcn.fusion import get_fusion, get_skeleton_imu_fusion_graph
+from models.mmargcn.rgb_feature_models import RgbEncoder
 
 
 class SkeletonImuEnhancedModel(nn.Module):

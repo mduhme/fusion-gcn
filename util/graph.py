@@ -94,37 +94,44 @@ class Graph:
             return np.diag(d)
         return d
 
-    def _reciprocal_degree(self, degree: np.ndarray) -> np.ndarray:
-        if self.is_directed:
-            return np.reciprocal(degree, where=degree > 0)
-        return np.reciprocal(np.sqrt(degree), where=degree > 0)
+    @staticmethod
+    def _reciprocal_degree(degree: np.ndarray, normalization: str) -> np.ndarray:
+        if normalization == "symmetric":
+            return np.reciprocal(np.sqrt(degree), where=degree > 0)
+        return np.reciprocal(degree, where=degree > 0)
 
-    def get_normalized_adjacency_matrix(self, add_self_connections=False):
+    @staticmethod
+    def _normalize(adj, d_mat_inv, normalization: str):
+        if normalization == "row":
+            return d_mat_inv.dot(adj)
+        elif normalization == "column":
+            return adj.dot(d_mat_inv)
+        elif normalization == "row_column":
+            return d_mat_inv.dot(adj).dot(d_mat_inv)
+        elif normalization == "symmetric":
+            return d_mat_inv.dot(adj).dot(d_mat_inv)
+        raise ValueError("Unsupported normalization: " + normalization)
+
+    def get_normalized_adjacency_matrix(self, normalization="row", add_self_connections=False):
         adj = self.get_adjacency_matrix().astype(np.float)
         if add_self_connections:
             adj += np.eye(self.num_vertices)
 
         d = np.sum(adj, axis=0)
-        d_inv = self._reciprocal_degree(d)
+        d_inv = Graph._reciprocal_degree(d, normalization)
         d_mat_inv = np.diag(d_inv)
+        return Graph._normalize(adj, d_mat_inv, normalization)
 
-        if self.is_directed:
-            return adj.dot(d_mat_inv)
-        return adj.dot(d_mat_inv).transpose().dot(d_mat_inv)
-
-    def get_normalized_sparse_adjacency_matrix(self, add_self_connections=False):
+    def get_normalized_sparse_adjacency_matrix(self, normalization="row", add_self_connections=False):
         adj = self.get_sparse_adjacency_matrix().astype(np.float)
         if add_self_connections:
             adj += sp.eye(self.num_vertices)
 
         # noinspection PyUnresolvedReferences
         d = adj.sum(axis=0).A1
-        d_inv = self._reciprocal_degree(d)
+        d_inv = Graph._reciprocal_degree(d, normalization)
         d_mat_inv = sp.diags(d_inv)
-
-        if self.is_directed:
-            return adj.dot(d_mat_inv)
-        return adj.dot(d_mat_inv).transpose().dot(d_mat_inv)
+        return Graph._normalize(adj, d_mat_inv, normalization)
 
     def get_laplacian_matrix(self):
         return self.get_degree_matrix() - self.get_adjacency_matrix()
@@ -162,8 +169,7 @@ class Graph:
         return ak, [(labels[a], labels[b], ak[a, b]) for a, b in res]
 
     def __str__(self):
-        return f"A =\n{self.get_adjacency_matrix()}\nD = {self.get_degree_matrix(False)}\nL =\n" \
-               f"{self.get_laplacian_matrix()}\n"
+        return f"|V| = {self.num_vertices}; |E| = {len(self.edges)}"
 
 
 def get_k_adjacency(adj: np.ndarray, k: int, with_self: bool = False, self_factor: int = 1) -> np.ndarray:

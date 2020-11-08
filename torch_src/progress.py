@@ -60,6 +60,7 @@ class StopWatch:
     """
     Measure duration of any operation.
     """
+
     def __init__(self):
         self.start_time = None
         self.end_time = None
@@ -172,8 +173,7 @@ class ProgressLogger:
         print(wrap_color(fmt, AnsiColors.MAGENTA), file=self._file)
 
         # Write metrics to tensorboard
-        for metric in metrics.get_metrics():
-            self._summary.add_scalar(metric.name, metric.value, self._current_epoch)
+        metrics.to_summary(self._summary, self._current_epoch + 1)
 
     def update_epoch_mode(self, mode: int, n: int = 1, metrics: str = None):
         self._modes_steps[mode] += n
@@ -201,15 +201,25 @@ class ProgressLogger:
 
 
 class CheckpointManager:
-    def __init__(self, checkpoint_path: str, state_dict_objects: dict):
+    def __init__(self, checkpoint_path: str, state_dict_objects: dict, num_checkpoints: int):
         self.checkpoint_path = checkpoint_path
         self.state_dict_objects = state_dict_objects
+        self.num_checkpoints = num_checkpoints
 
     def save_checkpoint(self, epoch: int, val_acc: float, **additional_objects: dict):
         os.makedirs(self.checkpoint_path, exist_ok=True)
 
         state_dicts = {k: v.state_dict() for k, v in self.state_dict_objects.items()}
         state_dicts = {**state_dicts, **additional_objects, "epoch": epoch}
+
+        existing_checkpoints = [file.name for file in os.scandir(self.checkpoint_path) if
+                                file.is_file() and file.name.startswith("checkpoint_") and file.name.endswith(".pt")]
+
+        if len(existing_checkpoints) >= self.num_checkpoints:
+            cp_acc = [float(file[file.rindex("_") + 1:file.rindex(".pt")]) for file in existing_checkpoints]
+            cp_acc_sorted = sorted(cp_acc, reverse=True)
+            checkpoint_to_remove = existing_checkpoints[cp_acc.index(cp_acc_sorted[-1])]
+            os.remove(os.path.join(self.checkpoint_path, checkpoint_to_remove))
 
         out_file = os.path.join(self.checkpoint_path, f"checkpoint_{epoch}_{val_acc:.4}.pt")
         torch.save(state_dicts, out_file)

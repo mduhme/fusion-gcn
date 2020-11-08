@@ -11,7 +11,6 @@ import math
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 
 from util.partition_strategy import GraphPartitionStrategy
 
@@ -58,10 +57,11 @@ class SpatialGraphConv(nn.Module):
         super().__init__()
         inter_channels = out_channels // coff_embedding
         self.inter_channels = inter_channels
+        self.num_subsets = num_subsets
+
         self.adj_b = nn.Parameter(torch.from_numpy(adj.astype(np.float32)))
         nn.init.constant_(self.adj_b, 1e-6)
-        self.adj_a = Variable(torch.from_numpy(adj.astype(np.float32)), requires_grad=False)
-        self.num_subsets = num_subsets
+        self.register_buffer("adj_a", torch.from_numpy(adj.astype(np.float32)))
 
         self.conv_a = nn.ModuleList()
         self.conv_b = nn.ModuleList()
@@ -94,8 +94,9 @@ class SpatialGraphConv(nn.Module):
 
     def forward(self, x):
         N, C, T, V = x.size()
-        adj = self.adj_a.cuda(x.get_device())
-        adj = adj + self.adj_b
+        # adj = self.adj_a.cuda(x.get_device())
+        # adj = adj + self.adj_b
+        adj = self.adj_a + self.adj_b
 
         y = None
         for i in range(self.num_subsets):

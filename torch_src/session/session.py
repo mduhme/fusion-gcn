@@ -6,8 +6,8 @@ import torch
 from torch.utils.data import DataLoader
 
 import session_helper
-from config import load_and_merge_configuration, save_configuration
-from metrics import MultiClassAccuracy, TopKAccuracy, SimpleMetric
+from config import load_and_merge_configuration, copy_configuration_to_output
+from metrics import MultiClassAccuracy, TopKAccuracy, SimpleMetric, ConfusionMatrix, AccuracyBarChart
 from progress import ProgressLogger, MetricsContainer
 from session.procedures.batch_train import BatchProcessor
 from util.dynamic_import import import_model, import_dataset_constants
@@ -57,9 +57,6 @@ class Session:
         Model = import_model(self._base_config.model)
         model = Model(data_shape, num_classes, graph, mode=self._base_config.mode,
                       **self._base_config.model_args).cuda()
-        # import torch.nn as nn
-        # l = [module for module in model.modules() if type(module) != nn.Sequential]
-        # print(l)
         loss_function = torch.nn.CrossEntropyLoss().cuda()
         optimizer = session_helper.create_optimizer(config["optimizer"], model, config["base_lr"],
                                                     **config["optimizer_args"])
@@ -112,18 +109,21 @@ class Session:
                 print(model)
 
     def save_base_configuration(self):
-        save_configuration(self._base_config, self.config_path)
+        copy_configuration_to_output(self._base_config.file, self.out_path)
+        # save_configuration(self._base_config, self.config_path)
 
     @staticmethod
-    def build_metrics(k: int = 5, additional_metrics: dict = None) -> MetricsContainer:
+    def build_metrics(num_classes: int, class_labels=None, k: int = 5,
+                      additional_metrics: dict = None) -> MetricsContainer:
         """
         Build different metrics. Metrics that are always included are learning rate, loss and accuracy.
 
+        :param num_classes: Number of classes for the current dataset
+        :param class_labels: A list of length 'num_classes' with class labels
         :param k: k for top-k accuracy; if k <= 1: don't include top-k accuracy
         :param additional_metrics: additional metrics as str: metric_type dictionary
         :return: container that holds all metrics
         """
-        # TODO add multi-class precision and recall
         # https://medium.com/data-science-in-your-pocket/calculating-precision-recall-for-multi-class-classification-9055931ee229
         # https://towardsdatascience.com/multi-class-metrics-made-simple-part-i-precision-and-recall-9250280bddc2?gi=a28f7efba99e
 
@@ -131,6 +131,18 @@ class Session:
             MultiClassAccuracy("training_accuracy"),
             MultiClassAccuracy("validation_accuracy")
         ]
+
+        conf_a = ConfusionMatrix(num_classes, "validation_confusion", class_labels=class_labels)
+        conf_b = ConfusionMatrix(num_classes, "training_confusion", class_labels=class_labels)
+        conf_a.write_to_summary_interval = 5
+        conf_b.write_to_summary_interval = 5
+
+        metrics_list.append(conf_a)
+        metrics_list.append(conf_b)
+
+        chart = AccuracyBarChart(num_classes, "train_val_diff", class_labels)
+        chart.write_to_summary_interval = 5
+        metrics_list.append(chart)
 
         if k > 1:
             metrics_list.append(TopKAccuracy(f"training_top{k}_accuracy", k=k))

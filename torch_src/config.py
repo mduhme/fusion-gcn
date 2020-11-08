@@ -1,10 +1,11 @@
 import argparse
 import copy
 import os
+import shutil
 
 import yaml
 
-from util.dynamic_import import import_class
+from util.dynamic_import import import_class, import_dataset_constants
 
 model_args_defaults = {
     "epochs": 50,
@@ -152,6 +153,12 @@ def get_configuration(session_types: tuple, optimizer_choices: tuple,
     if not hasattr(config, "model_args"):
         setattr(config, "model_args", {})
 
+    class_labels, skeleton_joint_labels = import_dataset_constants(config.dataset, ("actions", "skeleton_joints"))
+    if not hasattr(config, "class_labels"):
+        setattr(config, "class_labels", class_labels)
+    if not hasattr(config, "skeleton_joint_labels"):
+        setattr(config, "skeleton_joint_labels", skeleton_joint_labels)
+
     # Create output path if it does not exist
     if not os.path.exists(config.out_path):
         os.makedirs(config.out_path)
@@ -189,6 +196,10 @@ def make_default_model_config(base_config: argparse.Namespace) -> dict:
         attr = getattr(base_config, key, None)
         config[key] = attr if attr is not None else config[key]
     return config
+
+
+def copy_configuration_to_output(config_file: str, destination: str):
+    shutil.copy(config_file, destination)
 
 
 def save_configuration(config: argparse.Namespace, out_path: str):

@@ -40,7 +40,7 @@ class TrainingSession(Session):
         else:
             batch_processor.get_state_dict_objects(state_dict_objects)
             state_dict_objects = {k: v for k, v in state_dict_objects.items() if v is not None}
-            cp_manager = CheckpointManager(self.checkpoint_path, state_dict_objects)
+            cp_manager = CheckpointManager(self.checkpoint_path, state_dict_objects, 3)
 
         if progress or cp_manager:
             self._make_paths()
@@ -81,7 +81,7 @@ class TrainingSession(Session):
                 "loss_function": loss_function,
                 "lr_scheduler": lr_scheduler
             })
-        metrics = Session.build_metrics()
+        metrics = Session.build_metrics(num_classes, class_labels=self._base_config.class_labels)
 
         if progress:
             self.print_summary(model, **kwargs)

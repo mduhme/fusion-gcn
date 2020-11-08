@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torchvision.models as models
 
-import models.mmagcn.agcn as agcn
+import models.mmargcn.agcn as agcn
 from util.graph import Graph
 
 

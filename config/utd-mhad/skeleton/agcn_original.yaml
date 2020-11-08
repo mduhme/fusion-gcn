@@ -6,7 +6,7 @@ input_data:
     loader_args:
       in_memory: True
 
-out_path: ..\models\agcn\UTD-MHAD
+out_path: ..\models\mmargcn\UTD-MHAD
 model: agcn
 dataset: UTD-MHAD
 session_type: training

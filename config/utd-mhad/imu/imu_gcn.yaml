@@ -2,29 +2,23 @@
 # The RGB frame is first fed to a 2D CNN. The pooled output of that 2D CNN will be used as graph input for AGCN.
 
 input_data:
-  - path: ..\preprocessed_data\UTD-MHAD\rgb_default
+  - path: ..\preprocessed_data\UTD-MHAD\imu_default
     loader: NumpyDatasetLoader
 
-out_path: ..\models\agcn\UTD-MHAD
-model: mmagcn
+out_path: ..\models\mmargcn\UTD-MHAD
+model: mmargcn
 dataset: UTD-MHAD
 session_type: training
 fixed_seed: 1
 
-mode: rgb_encoder_model
+mode: imu_gcn
 
 base_lr: 0.001
 optimizer: ADAM
 optimizer_args:
   weight_decay: 0.01
 
-lr_scheduler: multistep
-lr_scheduler_args:
-  milestones:
-    - 10
-    - 25
-    - 40
-  gamma: 0.1
+lr_scheduler: ca
 
 batch_size: 8
 epochs: 50

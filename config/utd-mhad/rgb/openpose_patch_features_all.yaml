@@ -5,8 +5,8 @@ input_data:
   - path: ..\preprocessed_data\UTD-MHAD\rgb_patch_features_op
     loader: NumpyDatasetLoader
 
-out_path: ..\models\agcn\UTD-MHAD
-model: mmagcn
+out_path: ..\models\mmargcn\UTD-MHAD
+model: mmargcn
 dataset: UTD-MHAD
 session_type: training
 fixed_seed: 1

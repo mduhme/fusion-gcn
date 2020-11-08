@@ -1,6 +1,16 @@
 # Multimodal Action Recognition using Graph Convolutional Neural Networks
 
 ## Running preprocessing and training
+
+**Preparing directory structure**
+By default, the project expects the following directory structure:  
+`../MMAGCN` (where this file is located)  
+`../unprocessed_data/<dataset>/`  (Unzipped and unprocessed dataset files)
+`../preprocessed_data/<dataset>/` (Result from step 1 will be stored here; will be created automatically)  
+`../models/mmargcn`  (Result from step 3 will be stored here; will be created automatically)
+
+`<dataset>` can be **UTD-MHAD**, **NTU-RGB-D**, **MMACT**.
+
 **When running:**
 - Working directory should always be the project root directory (where this file is located).
 - Running in PyCharm: Mark directory 'torch_src' as *Sources Root*

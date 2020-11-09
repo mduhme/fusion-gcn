@@ -23,12 +23,6 @@ optimizer_args:
   weight_decay: 0.01
 
 lr_scheduler: ca
-# lr_scheduler_args:
-#   milestones:
-#     - 10
-#     - 25
-#     - 40
-#   gamma: 0.1
 
 batch_size: 8
 epochs: 50

@@ -1,4 +1,4 @@
-# Run AGCN on skeleton data with different hyperparameters than in original AGCN paper/code
+# Run MSG3D on skeleton data with different hyperparameters than in original paper/code
 
 input_data:
   - path: ..\preprocessed_data\UTD-MHAD\skeleton_default
@@ -6,8 +6,8 @@ input_data:
     loader_args:
       in_memory: True
 
-out_path: ..\models\mmargcn\UTD-MHAD
-model: agcn
+out_path: ..\models\msg3d\UTD-MHAD
+model: msg3d
 dataset: UTD-MHAD
 session_type: training
 fixed_seed: 1
@@ -17,9 +17,7 @@ optimizer: ADAM
 optimizer_args:
   weight_decay: 0.01
 
-lr_scheduler: cawr
-lr_scheduler_args:
-  T_0: 20
+lr_scheduler: ca
 
 batch_size: 8
-epochs: 60
+epochs: 50

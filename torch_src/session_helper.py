@@ -54,6 +54,7 @@ available_optimizers = {
 
 # noinspection PyUnresolvedReferences
 available_lr_schedulers = {
+    "step": torch.optim.lr_scheduler.StepLR,
     "multistep": torch.optim.lr_scheduler.MultiStepLR,
     "onecycle": torch.optim.lr_scheduler.OneCycleLR,
     "exp": torch.optim.lr_scheduler.ExponentialLR,

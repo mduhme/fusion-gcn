@@ -118,7 +118,7 @@ def get_configuration(session_types: tuple, optimizer_choices: tuple,
         load_and_merge_configuration(config, config.file)
 
     # Raise an error if any of the required arguments aren't provided
-    required_args = ["input_data", "out_path", "model", "dataset", "session_type"]
+    required_args = ["file", "input_data", "out_path", "model", "dataset", "session_type"]
     if not all(hasattr(config, attr) for attr in required_args):
         raise LookupError("The following arguments are required: " + ", ".join(required_args))
 

@@ -91,7 +91,7 @@ def fill_default_learning_rate_scheduler_args(config: dict) -> dict:
 
         },
         "cawr": {
-            "T_0": 8
+            "T_0": 10
         },
         None: {}
     }[config["lr_scheduler"]]

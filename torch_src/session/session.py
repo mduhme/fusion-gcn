@@ -27,7 +27,8 @@ class Session:
             self._is_resume = True
         else:
             self._is_resume = False
-            self.session_id = time.strftime(f"{self.session_type}_%Y_%m_%d-%H_%M_%S")
+            mode_id = os.path.splitext(os.path.basename(self._base_config.file))[0]
+            self.session_id = time.strftime(f"{self.session_type}_%Y_%m_%d-%H_%M_%S_{mode_id}")
 
         self.out_path = os.path.join(self._base_config.out_path, self.session_id)
         self.log_path = os.path.join(self.out_path, "logs")

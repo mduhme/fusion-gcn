@@ -2,12 +2,12 @@
 
 ## Running preprocessing and training
 
-**Preparing directory structure**
+**Preparing directory structure**  
 By default, the project expects the following directory structure:  
-`../MMAGCN` (where this file is located)  
-`../unprocessed_data/<dataset>/`  (Unzipped and unprocessed dataset files)
-`../preprocessed_data/<dataset>/` (Result from step 1 will be stored here; will be created automatically)  
-`../models/mmargcn`  (Result from step 3 will be stored here; will be created automatically)
+- `../MMAGCN` (where this file is located)
+- `../unprocessed_data/<dataset>/`  (Unzipped and unprocessed dataset files)
+- `../preprocessed_data/<dataset>/` (Result from step 1 will be stored here; will be created automatically)
+- `../models/mmargcn`  (Result from step 3 will be stored here; will be created automatically)
 
 `<dataset>` can be **UTD-MHAD**, **NTU-RGB-D**, **MMACT**.
 
@@ -47,13 +47,12 @@ The modality is the prefix (e.g. "rgb_"). Only specify one mode per modality.
 - **rgb_group_patch_features**: Same as *rgb_group_patch_features_op* but retrieve coordinates like in *rgb_patch_features*
 
 2. Create (or use existing) training/evaluation configuration under `./config/<dataset>/`.
-Selected configuration file must refer to the selected mode from preprocessing.
 
 3. Run `./torch_src/main.py` using configuration or command line parameters. View options by running `./torch_src/main.py --help`.
 
 
 ## Code
-- Preprocessing related code is found in util.preprocessing and datasets/<dataset>/.
+- Preprocessing related code is found in `./util/preprocessing/` and `./datasets/<dataset>/`.
 - torch_src contains the main network implementation.
 - tf_src contains an implementation of AGCN (Two-Stream Adaptive Graph Convolutional Networks for Skeleton-Based Action Recognition) and GCN (Semi-Supervised Classification with Graph Convolutional Networks) in tensorflow.
 

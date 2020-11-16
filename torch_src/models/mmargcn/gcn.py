@@ -62,24 +62,6 @@ class GCN(nn.Module):
         for layer_idx, layer in enumerate(self.layers):
             setattr(self, f"gc{layer_idx + 1}", layer)
 
-        # self.gc1 = gc(feature_dim, inner_feature_dim, adj, sparse=sparse, residual=False)
-        # self.gc2 = gc(inner_feature_dim, inner_feature_dim, adj, sparse=sparse, dropout=dropout)
-        # self.gc3 = gc(inner_feature_dim, inner_feature_dim, adj, sparse=sparse, dropout=dropout)
-        # self.gc4 = gc(inner_feature_dim, inner_feature_dim, adj, sparse=sparse, dropout=dropout)
-        # self.gc5 = gc(inner_feature_dim, inner_feature_dim * 2, adj, sparse=sparse, dropout=dropout)
-        # inner_feature_dim *= 2
-        # self.gc6 = gc(inner_feature_dim, inner_feature_dim, adj, sparse=sparse, dropout=dropout)
-        # self.gc7 = gc(inner_feature_dim, inner_feature_dim, adj, sparse=sparse, dropout=dropout)
-        # self.gc8 = gc(inner_feature_dim, inner_feature_dim * 2, adj, sparse=sparse, dropout=dropout)
-        # inner_feature_dim *= 2
-        # self.gc9 = gc(inner_feature_dim, inner_feature_dim, adj, sparse=sparse, dropout=dropout)
-        # self.gc10 = gc(inner_feature_dim, inner_feature_dim, adj, sparse=sparse, dropout=dropout)
-        # self.gc11 = gc(256, 512, adj, sparse=sparse, dropout=dropout)
-        # self.gc12 = gc(512, 512, adj, sparse=sparse, dropout=dropout)
-        # self.gc12 = gc(512, 512, adj, sparse=sparse, dropout=dropout)
-        # self.gc13 = gc(512, 1024, adj, sparse=sparse, dropout=dropout)
-        # self.gc14 = gc(1024, 1024, adj, sparse=sparse, dropout=dropout)
-        # self.gc15 = gc(1024, 1024, adj, sparse=sparse, dropout=dropout)
         self.fc = nn.Linear(inner_feature_dim, num_classes)
         nn.init.normal_(self.fc.weight, 0, math.sqrt(2. / num_classes))
 
@@ -91,22 +73,6 @@ class GCN(nn.Module):
 
         for layer in self.layers:
             x = layer(x)
-
-        # x = self.gc1(x)
-        # x = self.gc2(x)
-        # x = self.gc3(x)
-        # x = self.gc4(x)
-        # x = self.gc5(x)
-        # x = self.gc6(x)
-        # x = self.gc7(x)
-        # x = self.gc8(x)
-        # x = self.gc9(x)
-        # x = self.gc10(x)
-        # x = self.gc11(x)
-        # x = self.gc12(x)
-        # x = self.gc13(x)
-        # x = self.gc14(x)
-        # x = self.gc15(x)
 
         x = x.mean(-1)
         x = self.fc(x)

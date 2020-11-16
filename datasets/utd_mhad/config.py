@@ -154,6 +154,15 @@ settings = {
         }
     },
 
+    "imu_signal_image": {
+        "processors": {
+            "inertial": "inertial.InertialProcessor"
+        },
+        "modes": {
+            "inertial": "signal_image"
+        }
+    },
+
     # extract 2D bounding boxes from openpose skeletons
     "op_bb": {
         "processors": {

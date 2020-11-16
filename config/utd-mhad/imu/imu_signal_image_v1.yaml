@@ -1,0 +1,28 @@
+# Process IMU signal as image with algorithm based on
+# 'Human Activity Recognition Using Wearable Sensors by Deep Convolutional Neural Networks' (2015)
+# Network architecture is based on paper:
+# 'Multidomain Multimodal Fusion For Human Action Recognition Using Inertial Sensors' (2020)
+
+input_data:
+  - path: ..\preprocessed_data\UTD-MHAD\imu_signal_image
+    loader: NumpyDatasetLoader
+
+out_path: ..\models\mmargcn\UTD-MHAD
+model: mmargcn
+dataset: UTD-MHAD
+session_type: training
+fixed_seed: 1
+
+mode: imu_signal_image
+model_args:
+  variant: v1
+
+base_lr: 0.001
+optimizer: ADAM
+optimizer_args:
+  weight_decay: 0.01
+
+lr_scheduler: ca
+
+batch_size: 8
+epochs: 50

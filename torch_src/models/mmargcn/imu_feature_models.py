@@ -90,7 +90,7 @@ class ImuGCN(nn.Module):
         self.gcn = GCN(adj, (self.num_features, num_nodes), num_classes, dropout, sparse, gc_model, num_layers,
                        inner_feature_dim, include_additional_top_layer)
 
-    def forward(self, x) -> None:
+    def forward(self, x):
         if self.graph_node_format == "node_per_value":
             x = x.flatten(start_dim=1).unsqueeze(1).contiguous()
         elif self.graph_node_format == "node_per_sensor":
@@ -106,3 +106,54 @@ class ImuSignalImageModel(nn.Module):
     def __init__(self, data_shape, num_classes: int, **kwargs):
         super().__init__()
         data_shape = data_shape["inertial"]
+        if len(data_shape) > 2:
+            # data_shape is (num_channels, height, width)
+            self.num_channels = data_shape[0]
+        else:
+            # data_shape is (height, width)
+            self.num_channels = 1
+
+        variant = kwargs.get("variant", "v1")
+        if variant == "v1":
+            # Architecture is based on the paper
+            # 'Multidomain Multimodal Fusion For Human Action Recognition Using Inertial Sensors' (2020)
+            # Some things unclear about the paper:
+            # - Two "pooling" layers are mentioned but not the type of pooling
+            # - The output dimension of the first fc layer is not specified
+            # - What happens after pool2? Flatten or taking mean?
+            #  -> add averaging and just use same dim as conv layer output
+            self.conv1 = nn.Conv2d(self.num_channels, 50, kernel_size=5)
+            self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
+            self.conv2 = nn.Conv2d(50, 100, kernel_size=5)
+            self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+            self.fc1 = nn.Linear(23400, 2048)
+            self.fc2 = nn.Linear(2048, num_classes)
+
+        elif variant == "v2":
+            # Architecture is based on the paper
+            # 'Human Activity Recognition Using Wearable Sensors by Deep Convolutional Neural Networks' (2015)
+            # Second pooling layer removed because image dimension is smaller here
+            # Some things unclear about the paper:
+            # - What happens after pool2? Flatten or taking mean?
+            #  -> add averaging and just use same dim as conv layer output
+            self.conv1 = nn.Conv2d(self.num_channels, 5, kernel_size=5)
+            self.pool1 = nn.AvgPool2d(kernel_size=4, stride=4)
+            self.conv2 = nn.Conv2d(5, 10, kernel_size=5)
+            self.pool2 = lambda x: x
+            self.fc1 = nn.Linear(760, 120)
+            self.fc2 = nn.Linear(120, num_classes)
+
+        else:
+            raise ValueError("Unsupported method of processing IMU signal images: " + variant)
+
+    def forward(self, x):
+        if self.num_channels == 1 and len(x.shape) == 3:
+            x = torch.unsqueeze(x, 1)
+        x = self.conv1(x)
+        x = self.pool1(x)
+        x = self.conv2(x)
+        x = self.pool2(x)
+        x = torch.flatten(x, start_dim=1)
+        x = self.fc1(x)
+        x = self.fc2(x)
+        return x

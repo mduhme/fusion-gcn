@@ -1,5 +1,7 @@
-# IMU sequence (num_frames, 6) is treated as a graph with num_frames * 2 nodes
-# (one node for acc + one node for gyro for each time step) and processed in a GCN
+# Process IMU signal as image with algorithm based on
+# 'Human Activity Recognition Using Wearable Sensors by Deep Convolutional Neural Networks' (2015)
+# Network architecture is based on paper:
+# 'Human Activity Recognition Using Wearable Sensors by Deep Convolutional Neural Networks' (2015)
 
 input_data:
   - path: ..\preprocessed_data\UTD-MHAD\imu_signal_image
@@ -12,6 +14,8 @@ session_type: training
 fixed_seed: 1
 
 mode: imu_signal_image
+model_args:
+  variant: v2
 
 base_lr: 0.001
 optimizer: ADAM

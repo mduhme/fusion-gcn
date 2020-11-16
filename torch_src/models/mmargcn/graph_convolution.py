@@ -32,8 +32,6 @@ class STGCNGraphConvolution(nn.Module):
 
     def forward(self, x):
         support = self.conv(x)
-        # support = torch.einsum("bij,ki->bkj", x, self.weight)
-        # x0 = torch.matmul(x.permute(0, 2, 1), self.weight.t()).permute(0, 2, 1)
 
         if self.sparse:
             # very slow ...

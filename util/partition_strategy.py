@@ -14,10 +14,11 @@ class GraphPartitionStrategy:
         self.strategy = strategy
         assert strategy in ("uniform", "distance", "spatial")
 
-    def get_adjacency_matrix_array(self, graph: util.graph.Graph):
+    def get_adjacency_matrix_array(self, graph: util.graph.Graph, normalization: str = "column"):
         """
         Applies a partition strategy to the input graph and returns one or more adjacency matrices.
         :param graph: Input graph
+        :param normalization: Normalization order for adjacency matrix
         :return: A numpy array of shape (K, N, N)
         where K is the number of subsets and N the number of nodes in the graph.
         """
@@ -40,8 +41,8 @@ class GraphPartitionStrategy:
             # The third matrix stores outgoing connections, so A[0, 1] > 1, the opposite from the second matrix.
             a = np.empty((3, graph.num_vertices, graph.num_vertices))
             a[0] = np.eye(graph.num_vertices)
-            a[1] = graph.as_directed().with_reversed_edges().get_normalized_adjacency_matrix(normalization="column")
-            a[2] = graph.as_directed().get_normalized_adjacency_matrix(normalization="column")
+            a[1] = graph.as_directed().with_reversed_edges().get_normalized_adjacency_matrix(normalization)
+            a[2] = graph.as_directed().get_normalized_adjacency_matrix(normalization)
             return a
 
         # Uniform / Uni-labeling strategy (K = 1):

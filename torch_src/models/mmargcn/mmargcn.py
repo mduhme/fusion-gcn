@@ -51,6 +51,7 @@ class Model(nn.Module):
             # ----------------       IMU ONLY       ----------------
             # ------------------------------------------------------
             "imu_gcn": imu_models.ImuGCN,
+            "imu_signal_image": imu_models.ImuSignalImageModel,
 
             # ------------------------------------------------------
             # ----------------    SKELETON + RGB    ----------------

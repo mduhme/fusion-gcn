@@ -1,5 +1,5 @@
-# IMU sequence (num_frames, 6) is treated as a graph with num_frames * 6 nodes
-# and processed in a GCN
+# IMU sequence (num_frames, 6) is treated as a graph with num_frames * 2 nodes
+# (one node for acc + one node for gyro for each time step) and processed in a GCN
 
 input_data:
   - path: ..\preprocessed_data\UTD-MHAD\imu_default
@@ -12,6 +12,11 @@ session_type: training
 fixed_seed: 1
 
 mode: imu_gcn
+model_args:
+  graph_node_format: node_per_sensor
+  num_signals: 2
+  gc_model: agcn
+  inter_signal_back_connections: True
 
 base_lr: 0.001
 optimizer: ADAM
@@ -19,6 +24,8 @@ optimizer_args:
   weight_decay: 0.01
 
 lr_scheduler: ca
+# lr_scheduler_args:
+#  T_max: 55
 
 batch_size: 8
 epochs: 50

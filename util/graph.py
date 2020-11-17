@@ -102,6 +102,7 @@ class Graph:
 
     @staticmethod
     def _normalize(adj, d_mat_inv, normalization: str):
+        # https://math.stackexchange.com/questions/3035968/interpretation-of-symmetric-normalised-graph-adjacency-matrix
         if normalization == "row":
             return d_mat_inv.dot(adj)
         elif normalization == "column":

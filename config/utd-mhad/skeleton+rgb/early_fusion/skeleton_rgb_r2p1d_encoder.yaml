@@ -1,0 +1,25 @@
+# Use pretrained R(2+1)D network on RGB data.
+
+input_data:
+  - path: ..\preprocessed_data\UTD-MHAD\rgb_default
+    loader: NumpyDatasetLoader
+
+out_path: ..\models\mmargcn\UTD-MHAD
+model: mmargcn
+dataset: UTD-MHAD
+session_type: training
+fixed_seed: 1
+
+mode: rgb_r2p1d_agcn
+model_args:
+  pretrained_weights_path: ..\models\3dcnn\r2p1d18_K_200ep.pth
+
+base_lr: 0.001
+optimizer: ADAM
+optimizer_args:
+  weight_decay: 0.01
+
+lr_scheduler: ca
+
+batch_size: 8
+epochs: 50

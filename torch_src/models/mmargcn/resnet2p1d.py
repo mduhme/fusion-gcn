@@ -5,13 +5,10 @@ Kensho Hara, Hirokatsu Kataoka, & Yutaka Satoh (2018).
 Can Spatiotemporal 3D CNNs Retrace the History of 2D CNNs and ImageNet?.
 In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR) (pp. 6546–6555).
 """
-
-import math
 from functools import partial
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 def get_inplanes():
@@ -36,7 +33,8 @@ def conv3x1x1(mid_planes, planes, stride=1):
                      bias=False)
 
 
-def conv1x1x1(in_planes, out_planes, stride=1):
+def conv1x1x1(in_planes, out_planes, stride=None):
+    stride = stride or 1
     return nn.Conv3d(in_planes,
                      out_planes,
                      kernel_size=1,
@@ -47,15 +45,14 @@ def conv1x1x1(in_planes, out_planes, stride=1):
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, in_planes, planes, stride=1, downsample=None):
+    def __init__(self, in_planes, planes, stride=1, downsample=None, temporal_stride=1):
         super().__init__()
-
         n_3d_parameters1 = in_planes * planes * 3 * 3 * 3
         n_2p1d_parameters1 = in_planes * 3 * 3 + 3 * planes
         mid_planes1 = n_3d_parameters1 // n_2p1d_parameters1
         self.conv1_s = conv1x3x3(in_planes, mid_planes1, stride)
         self.bn1_s = nn.BatchNorm3d(mid_planes1)
-        self.conv1_t = conv3x1x1(mid_planes1, planes, stride)
+        self.conv1_t = conv3x1x1(mid_planes1, planes, temporal_stride)
         self.bn1_t = nn.BatchNorm3d(planes)
 
         n_3d_parameters2 = planes * planes * 3 * 3 * 3
@@ -154,9 +151,11 @@ class ResNet(nn.Module):
                  conv1_t_size=7,
                  conv1_t_stride=1,
                  no_max_pool=False,
-                 shortcut_type='B',
+                 shortcut_type="B",
                  widen_factor=1.0,
-                 n_classes=400):
+                 n_classes=700,
+                 temporal_stride=None,
+                 no_avg=False):
         super().__init__()
 
         block_inplanes = [int(x * widen_factor) for x in block_inplanes]
@@ -183,66 +182,72 @@ class ResNet(nn.Module):
         self.bn1_t = nn.BatchNorm3d(self.in_planes)
         self.relu = nn.ReLU(inplace=True)
 
-        self.maxpool = nn.MaxPool3d(kernel_size=3, stride=2, padding=1)
+        max_pool_stride = (temporal_stride or 2, 2, 2)
+        self.maxpool = nn.MaxPool3d(kernel_size=3, stride=max_pool_stride, padding=1)
         self.layer1 = self._make_layer(block, block_inplanes[0], layers[0],
                                        shortcut_type)
         self.layer2 = self._make_layer(block,
                                        block_inplanes[1],
                                        layers[1],
                                        shortcut_type,
-                                       stride=2)
+                                       stride=2,
+                                       temporal_stride=temporal_stride)
         self.layer3 = self._make_layer(block,
                                        block_inplanes[2],
                                        layers[2],
                                        shortcut_type,
-                                       stride=2)
+                                       stride=2,
+                                       temporal_stride=temporal_stride)
         self.layer4 = self._make_layer(block,
                                        block_inplanes[3],
                                        layers[3],
                                        shortcut_type,
-                                       stride=2)
+                                       stride=2,
+                                       temporal_stride=temporal_stride)
 
-        self.avgpool = nn.AdaptiveAvgPool3d((1, 1, 1))
-        self.fc = nn.Linear(block_inplanes[3] * block.expansion, n_classes)
+        if not no_avg:
+            self.avgpool = nn.AdaptiveAvgPool3d((1, 1, 1))
+        self.out_dim = block_inplanes[3] * block.expansion
+        self.fc = nn.Linear(self.out_dim, n_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
                 nn.init.kaiming_normal_(m.weight,
-                                        mode='fan_out',
-                                        nonlinearity='relu')
+                                        mode="fan_out",
+                                        nonlinearity="relu")
             elif isinstance(m, nn.BatchNorm3d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def _downsample_basic_block(self, x, planes, stride):
-        out = F.avg_pool3d(x, kernel_size=1, stride=stride)
+    @staticmethod
+    def _downsample_basic_block(x, planes, stride):
+        out = torch.nn.functional.avg_pool3d(x, kernel_size=1, stride=stride)
         zero_pads = torch.zeros(out.size(0), planes - out.size(1), out.size(2),
                                 out.size(3), out.size(4))
-        if isinstance(out.data, torch.cuda.FloatTensor):
+        if isinstance(out.data, torch.FloatTensor):
             zero_pads = zero_pads.cuda()
 
         out = torch.cat([out.data, zero_pads], dim=1)
 
         return out
 
-    def _make_layer(self, block, planes, blocks, shortcut_type, stride=1):
+    def _make_layer(self, block, planes, blocks, shortcut_type, stride=1, temporal_stride=None):
+        if temporal_stride is None:
+            temporal_stride = stride
+
         downsample = None
         if stride != 1 or self.in_planes != planes * block.expansion:
-            if shortcut_type == 'A':
-                downsample = partial(self._downsample_basic_block,
+            if shortcut_type == "A":
+                downsample = partial(ResNet._downsample_basic_block,
                                      planes=planes * block.expansion,
                                      stride=stride)
             else:
                 downsample = nn.Sequential(
-                    conv1x1x1(self.in_planes, planes * block.expansion, stride),
+                    conv1x1x1(self.in_planes, planes * block.expansion, (temporal_stride, stride, stride)),
                     nn.BatchNorm3d(planes * block.expansion))
 
-        layers = []
-        layers.append(
-            block(in_planes=self.in_planes,
-                  planes=planes,
-                  stride=stride,
-                  downsample=downsample))
+        layers = [block(in_planes=self.in_planes, planes=planes, stride=stride, downsample=downsample,
+                        temporal_stride=temporal_stride)]
         self.in_planes = planes * block.expansion
         for i in range(1, blocks):
             layers.append(block(self.in_planes, planes))
@@ -265,16 +270,15 @@ class ResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
-        x = self.avgpool(x)
-
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-
+        if hasattr(self, "avgpool"):
+            x = self.avgpool(x)
+            x = x.view(x.size(0), -1)
+        # x = self.fc(x)
         return x
 
 
-def generate_model(model_depth, **kwargs):
-    assert model_depth in [10, 18, 34, 50, 101, 152, 200]
+def generate_model(model_depth, **kwargs) -> ResNet:
+    pretrained_weights_path = kwargs.pop("pretrained_weights_path", None)
 
     if model_depth == 10:
         model = ResNet(BasicBlock, [1, 1, 1, 1], get_inplanes(), **kwargs)
@@ -290,5 +294,12 @@ def generate_model(model_depth, **kwargs):
         model = ResNet(Bottleneck, [3, 8, 36, 3], get_inplanes(), **kwargs)
     elif model_depth == 200:
         model = ResNet(Bottleneck, [3, 24, 36, 3], get_inplanes(), **kwargs)
+    else:
+        raise ValueError(f"Unsupported depth: {model_depth}")
 
+    if pretrained_weights_path is not None:
+        state_dict = torch.load(pretrained_weights_path)["state_dict"]
+        model.load_state_dict(state_dict)
+
+    model.fc = None
     return model

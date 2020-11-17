@@ -1,6 +1,7 @@
 import torch.nn as nn
 
 import models.mmargcn.agcn as agcn
+import models.mmargcn.resnet2p1d as r2p1d
 from models.mmargcn.fusion import get_fusion, get_skeleton_imu_fusion_graph
 from models.mmargcn.rgb_feature_models import RgbEncoder
 
@@ -85,3 +86,19 @@ class SkeletonImuRgbEarlyFusion(nn.Module):
         # Run graph convolutional neural network
         y = self.agcn(fused_data)
         return y
+
+
+class RgbR2p1DAgcn(nn.Module):
+    # noinspection PyUnusedLocal
+    def __init__(self, data_shape, num_classes: int, graph, **kwargs):
+        super().__init__()
+        model_depth = kwargs.get("model_depth", 10)
+        self.r2p1d = r2p1d.generate_model(model_depth, temporal_stride=1, no_avg=True)
+        self.agcn = agcn.Model(agcn_input_shape, num_classes, skeleton_imu_graph, num_layers=num_layers)
+        self.fc = nn.Linear(self.r2p1d.out_dim, num_classes)
+
+    def forward(self, x):
+        x = x.permute(0, 2, 1, 3, 4).contiguous()
+        x = self.r2p1d(x)
+        x = self.fc(x)
+        return x

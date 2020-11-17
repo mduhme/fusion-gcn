@@ -5,6 +5,7 @@ import torch.nn as nn
 import torchvision.models as models
 
 import models.mmargcn.agcn as agcn
+import models.mmargcn.resnet2p1d as r2p1d
 from util.graph import Graph
 
 
@@ -88,4 +89,20 @@ class RgbEncoderModel(nn.Module):
     def forward(self, x):
         x = self.rgb_encoder(x)
         x = self.agcn(x)
+        return x
+
+
+class RgbR2p1D(nn.Module):
+    # noinspection PyUnusedLocal
+    def __init__(self, data_shape, num_classes: int, graph, **kwargs):
+        super().__init__()
+        model_depth = kwargs.get("model_depth", 18)
+        pretrained_weights_path = kwargs.get("pretrained_weights_path", None)
+        self.r2p1d = r2p1d.generate_model(model_depth, pretrained_weights_path=pretrained_weights_path)
+        self.fc = nn.Linear(self.r2p1d.out_dim, num_classes)
+
+    def forward(self, x):
+        x = x.permute(0, 2, 1, 3, 4).contiguous()
+        x = self.r2p1d(x)
+        x = self.fc(x)
         return x

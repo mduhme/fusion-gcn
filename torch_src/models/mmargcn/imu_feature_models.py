@@ -88,7 +88,7 @@ class ImuGCN(nn.Module):
         adj = build_imu_graph_adjacency(data_shape, num_signals, gc_model, sparse, adjacency_normalization,
                                         num_temporal_back_connections, inter_signal_back_connections)
         self.gcn = GCN(adj, (self.num_features, num_nodes), num_classes, dropout, sparse, gc_model, num_layers,
-                       inner_feature_dim, include_additional_top_layer)
+                       inner_feature_dim, include_additional_top_layer, without_fc=kwargs.get("without_fc", False))
 
     def forward(self, x):
         if self.graph_node_format == "node_per_value":
@@ -145,6 +145,9 @@ class ImuSignalImageModel(nn.Module):
 
         else:
             raise ValueError("Unsupported method of processing IMU signal images: " + variant)
+
+        if kwargs.get("without_fc", False):
+            self.fc2 = lambda x: x
 
     def forward(self, x):
         if self.num_channels == 1 and len(x.shape) == 3:

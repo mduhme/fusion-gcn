@@ -95,6 +95,6 @@ def prepare_learning_rate_scheduler_args(config: dict, epochs: int, steps_per_ep
         config["lr_scheduler_args"]["steps_per_epoch"] = steps_per_epoch
     elif config["lr_scheduler"] == "ca":
         if "T_max" not in config["lr_scheduler_args"]:
-            config["lr_scheduler_args"]["T_max"] = epochs
+            config["lr_scheduler_args"]["T_max"] = epochs + 3
 
     return config

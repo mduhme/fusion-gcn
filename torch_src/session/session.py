@@ -135,14 +135,14 @@ class Session:
 
         conf_a = ConfusionMatrix(num_classes, "validation_confusion", class_labels=class_labels)
         conf_b = ConfusionMatrix(num_classes, "training_confusion", class_labels=class_labels)
-        conf_a.write_to_summary_interval = 5
-        conf_b.write_to_summary_interval = 5
+        conf_a.write_to_summary_interval = 10
+        conf_b.write_to_summary_interval = 10
 
         metrics_list.append(conf_a)
         metrics_list.append(conf_b)
 
         chart = AccuracyBarChart(num_classes, "train_val_diff", class_labels)
-        chart.write_to_summary_interval = 5
+        chart.write_to_summary_interval = 10
         metrics_list.append(chart)
 
         if k > 1:

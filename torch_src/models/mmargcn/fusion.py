@@ -23,6 +23,19 @@ class ProductFusion(Fusion):
         return functools.reduce(torch.mul, tensors)
 
 
+class AverageFusion(Fusion):
+    def combine(self, *tensors: torch.Tensor) -> torch.Tensor:
+        return torch.mean(torch.stack(tensors, dim=-1), dim=-1)
+
+
+class WeightedAverageFusion(Fusion):
+    def __init__(self, weights: torch.Tensor):
+        self.weights = weights
+
+    def combine(self, *tensors: torch.Tensor) -> torch.Tensor:
+        return torch.sum(torch.stack(tensors, dim=-1) * self.weights, dim=-1)
+
+
 class ConcatenateFusion(Fusion):
     def __init__(self, concatenate_dim: int):
         self._dim = concatenate_dim
@@ -35,7 +48,9 @@ def get_fusion(fusion_type: str, **kwargs) -> Fusion:
     fusion_types = {
         "sum": SumFusion,
         "product": ProductFusion,
-        "concatenate": ConcatenateFusion
+        "concatenate": ConcatenateFusion,
+        "average": AverageFusion,
+        "weighted_average": WeightedAverageFusion
     }
 
     if fusion_type not in fusion_types:

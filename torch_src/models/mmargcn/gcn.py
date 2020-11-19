@@ -25,7 +25,8 @@ class GCN(nn.Module):
 
     def __init__(self, adj: Union[torch.Tensor, torch.sparse.Tensor], data_shape: tuple,
                  num_classes: int, dropout: float = 0., sparse: bool = False, gc_model: str = "stgcn",
-                 num_layers: int = 10, inner_feature_dim: int = 64, include_additional_top_layer: bool = False):
+                 num_layers: int = 10, inner_feature_dim: int = 64, include_additional_top_layer: bool = False,
+                 without_fc: bool = False):
         super().__init__()
 
         assert num_layers >= 2
@@ -62,8 +63,11 @@ class GCN(nn.Module):
         for layer_idx, layer in enumerate(self.layers):
             setattr(self, f"gc{layer_idx + 1}", layer)
 
-        self.fc = nn.Linear(inner_feature_dim, num_classes)
-        nn.init.normal_(self.fc.weight, 0, math.sqrt(2. / num_classes))
+        if without_fc:
+            self.fc = lambda x: x
+        else:
+            self.fc = nn.Linear(inner_feature_dim, num_classes)
+            nn.init.normal_(self.fc.weight, 0, math.sqrt(2. / num_classes))
 
     def forward(self, x):
         batch_size, feature_dim, num_nodes = x.size()

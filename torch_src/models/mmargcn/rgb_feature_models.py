@@ -19,7 +19,8 @@ class RgbPatchFeaturesModel(nn.Module):
     def __init__(self, data_shape, num_classes: int, graph, **kwargs):
         super().__init__()
         num_layers = kwargs.get("num_layers", 10)
-        self.agcn = agcn.Model(data_shape["rgb"], num_classes, graph, num_layers=num_layers)
+        self.agcn = agcn.Model(data_shape["rgb"], num_classes, graph, num_layers=num_layers,
+                               without_fc=kwargs.get("without_fc", False))
 
     def forward(self, x):
         return self.agcn(x)
@@ -39,13 +40,14 @@ class RgbPatchGroupsFeaturesModel(nn.Module):
         edges = [tuple(map(int, edge.split(", "))) for edge in edges]
         graph = Graph(edges)
 
-        self.agcn = agcn.Model(data_shape["rgb"], num_classes, graph, num_layers=num_layers)
+        self.agcn = agcn.Model(data_shape["rgb"], num_classes, graph, num_layers=num_layers,
+                               without_fc=kwargs.get("without_fc", False))
 
     def forward(self, x):
         return self.agcn(x)
 
 
-class RgbEncoder(nn.Module):
+class RgbCnnEncoder(nn.Module):
     def __init__(self, **kwargs):
         super().__init__()
         self.num_bodies = kwargs.get("rgb_num_bodies", 1)
@@ -75,16 +77,17 @@ class RgbEncoder(nn.Module):
         return y
 
 
-class RgbEncoderModel(nn.Module):
+class RgbCnnEncoderModel(nn.Module):
     def __init__(self, data_shape, num_classes: int, graph, **kwargs):
         super().__init__()
         num_layers = kwargs.get("num_layers", 10)
 
-        self.rgb_encoder = RgbEncoder(rgb_num_vertices=graph.num_vertices, **kwargs)
+        self.rgb_encoder = RgbCnnEncoder(rgb_num_vertices=graph.num_vertices, **kwargs)
 
         agcn_input_shape = (self.rgb_encoder.num_bodies, data_shape["rgb"][0], self.rgb_encoder.num_vertices,
                             self.rgb_encoder.num_encoded_channels)
-        self.agcn = agcn.Model(agcn_input_shape, num_classes, graph, num_layers=num_layers)
+        self.agcn = agcn.Model(agcn_input_shape, num_classes, graph, num_layers=num_layers,
+                               without_fc=kwargs.get("without_fc", False))
 
     def forward(self, x):
         x = self.rgb_encoder(x)
@@ -92,17 +95,39 @@ class RgbEncoderModel(nn.Module):
         return x
 
 
-class RgbR2p1D(nn.Module):
+class RgbR2p1DModel(nn.Module):
     # noinspection PyUnusedLocal
     def __init__(self, data_shape, num_classes: int, graph, **kwargs):
         super().__init__()
         model_depth = kwargs.get("model_depth", 18)
         pretrained_weights_path = kwargs.get("pretrained_weights_path", None)
         self.r2p1d = r2p1d.generate_model(model_depth, pretrained_weights_path=pretrained_weights_path)
-        self.fc = nn.Linear(self.r2p1d.out_dim, num_classes)
+        if kwargs.get("without_fc", False):
+            self.fc = lambda x: x
+        else:
+            self.fc = nn.Linear(self.r2p1d.out_dim, num_classes)
 
     def forward(self, x):
         x = x.permute(0, 2, 1, 3, 4).contiguous()
         x = self.r2p1d(x)
         x = self.fc(x)
+        return x
+
+
+class RgbR2P1DEncoder(nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.num_encoded_channels = kwargs.get("rgb_node_encoding_feature_dim", 3)
+        self.num_additional_nodes = kwargs.get("num_additional_nodes", 3)
+        model_depth = kwargs.get("model_depth", 10)
+        self.r2p1d = r2p1d.generate_model(model_depth, temporal_stride=1, no_avg=True)
+        self.cnn = nn.Conv2d(self.r2p1d.out_dim, self.num_encoded_channels, kernel_size=(5, 1), padding=(2, 0))
+        self.avgpool = nn.AdaptiveAvgPool2d((None, self.num_additional_nodes))
+
+    def forward(self, x):
+        x = x.permute(0, 2, 1, 3, 4).contiguous()
+        x = self.r2p1d(x)
+        x = torch.flatten(x, start_dim=3)
+        x = self.cnn(x)
+        x = self.avgpool(x)
         return x

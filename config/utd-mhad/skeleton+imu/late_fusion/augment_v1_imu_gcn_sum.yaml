@@ -1,0 +1,37 @@
+
+input_data:
+  - path: ..\preprocessed_data\UTD-MHAD\skeleton_imu_enhanced
+    loader: NumpyDatasetLoader
+    loader_args:
+      in_memory: True
+  - path: ..\preprocessed_data\UTD-MHAD\imu_default
+    loader: NumpyDatasetLoader
+    loader_args:
+      in_memory: True
+
+out_path: ..\models\mmargcn\UTD-MHAD
+model: mmargcn
+dataset: UTD-MHAD
+session_type: training
+fixed_seed: 1
+
+mode: skeleton_imu_gcn_late_fusion
+model_args:
+  num_imu_joints: 2
+  imu_enhanced_mode: append_center
+  interconnect_imu_joints: True
+  graph_node_format: node_per_sensor
+  num_signals: 2
+  gc_model: agcn
+  fusion: sum
+  skeleton_imu_enhanced: True
+
+base_lr: 0.001
+optimizer: ADAM
+optimizer_args:
+  weight_decay: 0.01
+
+lr_scheduler: ca
+
+batch_size: 8
+epochs: 50

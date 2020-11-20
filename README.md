@@ -21,11 +21,10 @@ By default, the project expects the following directory structure:
 0. (Optional) Generate Openpose BODY_25 skeletons from RGB video:  
 Requires Openpose python API created from source to run.
 ```
-./datasets/<dataset>/gen_openpose_skeletons.py
---in_path <path_to_avi_or_mp4_files>
---out_path <path_to_store_processed_data>
---openpose_binary_path <path_to_openpose_binaries>
---openpose_python_pyth <path_to_openpose_python_files>
+./tools/openpose/gen_openpose_skeletons.py
+-d <dataset>
+--openpose_binary_path=<path_to_openpose_binaries>
+--openpose_python_pyth=<path_to_openpose_python_files>
 ```
 
 1. Preprocess dataset:  

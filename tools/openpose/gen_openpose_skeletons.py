@@ -78,6 +78,7 @@ def get_config() -> argparse.Namespace:
     parser.add_argument("--output_images", action="store_true",
                         help="If specified, output images with visible skeleton.")
     parser.add_argument("--model_pose", default="BODY_25", type=str, help="Which pose model to use.")
+    parser.add_argument("--skip_existing", action="store_true", help="Skip file if output already exists.")
     parser.add_argument("--debug", action="store_true", help="Only convert first found file.")
     args = parser.parse_args()
 
@@ -97,14 +98,21 @@ def convert_video_file(input_path: str, output_path: str, max_allowed_bodies: in
     pose_predicted_frames = openpose.estimate_pose_video(v)
     v.release()
 
-    # shape of skeletons is (num_frames, num_joints, 3 [= x, y, prob], num_bodies)
-    # 3-vector is: x-coord, y-coord, probability
-    max_bodies = np.max([pose_frame.poseKeypoints.shape[0] for pose_frame in pose_predicted_frames])
-    num_joints = pose_predicted_frames[0].poseKeypoints.shape[1]
+    def has_elements(array: np.ndarray):
+        return bool(array.ndim) and bool(array.size)
+
+    # shape of skeletons is (num_frames, num_joints, 3 [= x-coord, y-coord, probability], num_bodies)
+    max_bodies = np.max([pose_frame.poseKeypoints.shape[0]
+                         for pose_frame in pose_predicted_frames if has_elements(pose_frame.poseKeypoints)])
+    num_joints = next(pose_frame.poseKeypoints.shape[1]
+                      for pose_frame in pose_predicted_frames if has_elements(pose_frame.poseKeypoints))
 
     # Filter skeletons (sometimes random objects are detected as skeletons) and merge them in a single array.
     skeletons = np.zeros((len(pose_predicted_frames), num_joints, 3, max_allowed_bodies))
     for frame_idx, pose_frame in enumerate(pose_predicted_frames):
+        if not has_elements(pose_frame.poseKeypoints):
+            continue
+
         num_bodies = pose_frame.poseKeypoints.shape[0]
         if num_bodies > max_allowed_bodies:
             scores = np.array([body_score(body) for body in pose_frame.poseKeypoints])
@@ -135,8 +143,10 @@ def run_conversion(args: argparse.Namespace, dataset: Dataset):
         output_files = output_files[:1]
 
     with OpenPose(args.openpose_binary_path, args.openpose_python_path, args.model_pose) as openpose:
-        for input_file, output_file in tqdm(zip(input_files, output_files), "Detecting Openpose skeletons",
-                                            total=len(input_files)):
+        for input_file, output_file in tqdm(zip(input_files, output_files),
+                                            "Detecting Openpose skeletons in video files", total=len(input_files)):
+            if args.skip_existing and os.path.exists(output_file):
+                continue
             convert_video_file(input_file, output_file, dataset.max_bodies, openpose, args.output_images)
 
 

@@ -111,5 +111,4 @@ def body_score(body: np.ndarray) -> float:
     :param body: body of shape (num joints, 3)
     :return: body score
     """
-
     return float(np.sum(body[..., -1]))

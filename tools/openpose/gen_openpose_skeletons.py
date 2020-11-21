@@ -171,6 +171,7 @@ def run_conversion(args: argparse.Namespace, dataset: Dataset):
             if not os.path.exists(output_file) and input_file not in invalid_files:
                 break
 
+    n = len(input_files)
     if start > 0:
         input_files = input_files[start:]
         output_files = output_files[start:]
@@ -178,7 +179,7 @@ def run_conversion(args: argparse.Namespace, dataset: Dataset):
         os.remove(invalid_files_path)
 
     with OpenPose(args.openpose_binary_path, args.openpose_python_path, args.model_pose) as openpose:
-        with tqdm(initial=start, total=len(input_files)) as progress:
+        with tqdm(initial=start, total=n) as progress:
             for input_file, output_file in zip(input_files, output_files):
                 if not os.path.exists(output_file):
                     rel_path = os.path.relpath(input_file, dataset.in_path)

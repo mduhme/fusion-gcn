@@ -7,12 +7,13 @@ As of creation of this file (07.10.2020), Python 3.8+ is not working with compil
 import abc
 import argparse
 import os
+import contextlib
+from pathlib import Path
+from typing import List, Optional
 
 import cv2
 import numpy as np
 from tqdm import tqdm
-from pathlib import Path
-from typing import List, Optional
 
 from tools.openpose.openpose_wrapper import OpenPose, body_score
 
@@ -98,19 +99,23 @@ def convert_video_file(input_path: str, output_path: str, max_allowed_bodies: in
     pose_predicted_frames = openpose.estimate_pose_video(v)
     v.release()
 
-    def has_elements(array: np.ndarray):
-        return bool(array.ndim) and bool(array.size)
+    def has_elements(frame) -> bool:
+        pk: np.ndarray = frame.poseKeypoints
+        return bool(pk.ndim) and bool(pk.size)
+
+    filtered_frames = list(filter(has_elements, pose_predicted_frames))
+
+    if len(filtered_frames) == 0:
+        return False
+
+    max_bodies = np.max([pose_frame.poseKeypoints.shape[0] for pose_frame in filtered_frames])
+    num_joints = filtered_frames[0].poseKeypoints.shape[1]
 
     # shape of skeletons is (num_frames, num_joints, 3 [= x-coord, y-coord, probability], num_bodies)
-    max_bodies = np.max([pose_frame.poseKeypoints.shape[0]
-                         for pose_frame in pose_predicted_frames if has_elements(pose_frame.poseKeypoints)])
-    num_joints = next(pose_frame.poseKeypoints.shape[1]
-                      for pose_frame in pose_predicted_frames if has_elements(pose_frame.poseKeypoints))
-
     # Filter skeletons (sometimes random objects are detected as skeletons) and merge them in a single array.
     skeletons = np.zeros((len(pose_predicted_frames), num_joints, 3, max_allowed_bodies))
     for frame_idx, pose_frame in enumerate(pose_predicted_frames):
-        if not has_elements(pose_frame.poseKeypoints):
+        if not has_elements(pose_frame):
             continue
 
         num_bodies = pose_frame.poseKeypoints.shape[0]
@@ -133,21 +138,56 @@ def convert_video_file(input_path: str, output_path: str, max_allowed_bodies: in
                 continue
             cv2.imwrite(os.path.join(image_out_path, f"{idx:03d}.png"), pose_frame.cvOutputData)
 
+    return True
+
+
+def append_invalid_file(input_file: str, invalid_files_path: str):
+    with open(invalid_files_path, "a") as f:
+        f.write(input_file + "\n")
+
+
+def read_invalid_files(invalid_files_path: str):
+    invalid_files = []
+    if os.path.exists(invalid_files_path):
+        with open(invalid_files_path) as f:
+            invalid_files = [line.strip() for line in f.readlines()]
+    return invalid_files
+
 
 def run_conversion(args: argparse.Namespace, dataset: Dataset):
     dataset.out_path = os.path.join(dataset.out_path, cf.model_pose)
+    invalid_files_path = os.path.join(dataset.out_path, "invalid_files.txt")
     input_files = dataset.get_input_files()
     output_files = dataset.get_output_files(input_files)
     if args.debug:
         input_files = input_files[:1]
         output_files = output_files[:1]
 
+    # skip existing files
+    start = 0
+    if args.skip_existing:
+        invalid_files = read_invalid_files(invalid_files_path)
+        for start, (input_file, output_file) in enumerate(zip(input_files, output_files)):
+            if not os.path.exists(output_file) and input_file not in invalid_files:
+                break
+
+    if start > 0:
+        input_files = input_files[start:]
+        output_files = output_files[start:]
+    else:
+        os.remove(invalid_files_path)
+
     with OpenPose(args.openpose_binary_path, args.openpose_python_path, args.model_pose) as openpose:
-        for input_file, output_file in tqdm(zip(input_files, output_files),
-                                            "Detecting Openpose skeletons in video files", total=len(input_files)):
-            if args.skip_existing and os.path.exists(output_file):
-                continue
-            convert_video_file(input_file, output_file, dataset.max_bodies, openpose, args.output_images)
+        with tqdm(initial=start, total=len(input_files)) as progress:
+            for input_file, output_file in zip(input_files, output_files):
+                if not os.path.exists(output_file):
+                    rel_path = os.path.relpath(input_file, dataset.in_path)
+                    progress.set_description(f"Video to Openpose skeletons: '{rel_path}'")
+                    res = convert_video_file(input_file, output_file, dataset.max_bodies, openpose, args.output_images)
+                    if not res:
+                        # video didn't have a single skeleton
+                        append_invalid_file(input_file, invalid_files_path)
+                progress.update()
 
 
 if __name__ == "__main__":

@@ -7,7 +7,6 @@ As of creation of this file (07.10.2020), Python 3.8+ is not working with compil
 import abc
 import argparse
 import os
-import contextlib
 from pathlib import Path
 from typing import List, Optional
 
@@ -176,7 +175,8 @@ def run_conversion(args: argparse.Namespace, dataset: Dataset):
         input_files = input_files[start:]
         output_files = output_files[start:]
     else:
-        os.remove(invalid_files_path)
+        if os.path.exists(invalid_files_path):
+            os.remove(invalid_files_path)
 
     with OpenPose(args.openpose_binary_path, args.openpose_python_path, args.model_pose) as openpose:
         with tqdm(initial=start, total=n) as progress:

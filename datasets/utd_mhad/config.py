@@ -51,7 +51,7 @@ settings = {
 
     # Extract RGB patches using Openpose keypoints.
     # Mode should only be used for iterating over processed samples, not for output.
-    # Writing to a file requires ~150GB for UTD-MHAD for a patch size of 128x128
+    # Output is zip-compressed
     "rgb_patches_op": {
         "processors": {
             "rgb": "rgb.RGBVideoProcessor"

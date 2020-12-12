@@ -46,8 +46,8 @@ def get_skeleton_rgb_patches(rgb: np.ndarray,
     for idx, coord in enumerate(coords):
         # Only extract patch if coordinates are valid (!= 0)
         if coord.sum():
-            x1, x0 = np.clip(coord[1] + t * patch_radius, 0, w)
-            y1, y0 = np.clip(coord[0] + t * patch_radius, 0, h)
+            x1, x0 = np.clip(coord[0] + t * patch_radius, 0, w)
+            y1, y0 = np.clip(coord[1] + t * patch_radius, 0, h)
             xd, yd = x1 - x0, y1 - y0
             patches[idx, :yd, :xd] = rgb[y0:y1, x0:x1]
 

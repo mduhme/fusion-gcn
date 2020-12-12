@@ -203,7 +203,7 @@ class AccuracyBarChart(VisualMetric):
     @property
     def value(self):
         acc = {
-            k: torch.diagonal(v.value).float() / v.value.sum(dim=0)
+            k: torch.diagonal(v.value).float() / v.value.sum(dim=1)
             for k, v in self.bins.items()
         }
         return acc

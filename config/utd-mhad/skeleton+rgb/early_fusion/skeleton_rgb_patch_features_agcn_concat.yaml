@@ -1,0 +1,30 @@
+# Create a graph from each individual RGB frame.
+# The RGB frame is first fed to a 2D CNN. The pooled output of that 2D CNN will be used as graph
+# and fused with the skeleton graph before being processed by AGCN.
+# Fusion method: Vector concatenation
+
+input_data:
+  - path: ..\preprocessed_data\UTD-MHAD\skeleton_default__rgb_patch_features_op
+    loader: NumpyDatasetLoader
+
+out_path: ..\models\mmargcn\UTD-MHAD
+model: mmargcn
+dataset: UTD-MHAD
+session_type: training
+fixed_seed: 1
+
+mode: skeleton_rgb_patch_features_early_fusion
+model_args:
+  fusion: concatenate
+  patch_feature_hidden_dim: 128
+  patch_feature_output_dim: 6
+
+base_lr: 0.001
+optimizer: ADAM
+optimizer_args:
+  weight_decay: 0.01
+
+lr_scheduler: ca
+
+batch_size: 8
+epochs: 50

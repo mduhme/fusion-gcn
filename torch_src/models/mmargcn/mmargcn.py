@@ -28,6 +28,7 @@ class Model(nn.Module):
             # ------------------------------------------------------
             # ----------------    SKELETON + RGB    ----------------
             # ------------------------------------------------------
+            "skeleton_rgb_patch_features_early_fusion": early_fusion_models.SkeletonRgbPatchFeaturesEarlyFusion,
             "skeleton_rgb_encoding_early_fusion": early_fusion_models.SkeletonRgbEarlyFusion,
             "skeleton_rgb_encoding_r2p1d_early_fusion": early_fusion_models.SkeletonRgbR2P1DEarlyFusion,
             "skeleton_rgb_r2p1d_late_fusion": late_fusion_models.SkeletonRgbR2P1D,
@@ -41,7 +42,9 @@ class Model(nn.Module):
             # ------------------------------------------------------
             # ---------------- SKELETON + RGB + IMU ----------------
             # ------------------------------------------------------
-            "skeleton_imu_rgb_graph_early_fusion": early_fusion_models.SkeletonImuRgbEarlyFusion
+            "skeleton_imu_rgb_cnn_encoder_early_fusion": early_fusion_models.SkeletonImuRgbCnnEncoderEarlyFusion,
+            "skeleton_imu_rgb_patch_features_early_fusion": early_fusion_models.SkeletonImuRgbPatchFeaturesEarlyFusion,
+            "skeleton_imu_rgb_r2p1d_early_fusion": early_fusion_models.SkeletonImuRgbR2P1DEarlyFusion
         }
 
         if mode not in modes:

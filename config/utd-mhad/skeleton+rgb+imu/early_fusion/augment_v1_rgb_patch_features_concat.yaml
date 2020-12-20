@@ -1,0 +1,29 @@
+# Combine skeleton+imu augment_v1 with RGB patch features
+
+input_data:
+  - path: ..\preprocessed_data\UTD-MHAD\skeleton_imu_enhanced__rgb_patch_features_op
+    loader: NumpyDatasetLoader
+
+out_path: ..\models\mmargcn\UTD-MHAD
+model: mmargcn
+dataset: UTD-MHAD
+session_type: training
+fixed_seed: 1
+
+mode: skeleton_imu_rgb_patch_features_early_fusion
+model_args:
+  fusion: concatenate
+  num_imu_joints: 2
+  imu_enhanced_mode: append_center
+  patch_feature_hidden_dim: 128
+  patch_feature_output_dim: 6
+
+base_lr: 0.001
+optimizer: ADAM
+optimizer_args:
+  weight_decay: 0.01
+
+lr_scheduler: ca
+
+batch_size: 8
+epochs: 50

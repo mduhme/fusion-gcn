@@ -1,5 +1,4 @@
-# Create a graph from each individual RGB frame.
-# The RGB frame is first fed to a 2D CNN. The pooled output of that 2D CNN will be used as graph input for AGCN.
+# Combine skeleton+imu augment_v1 with R2P1D RGB embeddings
 
 input_data:
   - path: ..\preprocessed_data\UTD-MHAD\skeleton_imu_enhanced__rgb_default
@@ -11,14 +10,11 @@ dataset: UTD-MHAD
 session_type: training
 fixed_seed: 1
 
-mode: skeleton_imu_rgb_graph_early_fusion
+mode: skeleton_imu_rgb_r2p1d_early_fusion
+grad_accum_step: 4
 model_args:
-  fusion: concatenate
   num_imu_joints: 2
-  imu_enhanced_mode: append_right
-  right_wrist_joint: 10
-  right_hip_joint: 16
-  interconnect_imu_joints: True
+  imu_enhanced_mode: append_center
 
 base_lr: 0.001
 optimizer: ADAM

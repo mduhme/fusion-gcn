@@ -7,7 +7,6 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Sequence, Union
 
 import matplotlib.pyplot as plt
-import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 

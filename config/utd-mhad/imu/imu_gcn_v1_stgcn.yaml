@@ -15,6 +15,7 @@ mode: imu_gcn
 model_args:
   graph_node_format: node_per_value
   gc_model: stgcn
+  inner_feature_dim: 512
 
 base_lr: 0.001
 optimizer: ADAM

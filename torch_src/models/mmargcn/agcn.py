@@ -139,8 +139,8 @@ class Model(nn.Module):
                  without_fc=False, dropout: float = 0.):
         super().__init__()
 
-        # data_shape = (num_persons, num_frames, num_joints, num_channels)
-        num_persons, _, num_joints, num_channels = data_shape
+        # data_shape = (num_frames, num_joints, num_channels, num_persons)
+        _, num_joints, num_channels, num_persons = data_shape
 
         strategy = GraphPartitionStrategy()
         adj = strategy.get_adjacency_matrix_array(graph)

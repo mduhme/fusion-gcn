@@ -15,5 +15,8 @@ class FileMetaData:
         for name, prop in self.properties.items():
             setattr(self, name, prop)
 
+    def is_same_action(self, other):
+        return self.subject == other.subject and self.action == other.action and self.properties == other.properties
+
     def __str__(self):
         return os.path.splitext(os.path.basename(self.file_name))[0]

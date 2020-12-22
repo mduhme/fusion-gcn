@@ -18,12 +18,12 @@ skeleton_max_sequence_length = 128  # 125 actually but 128 is multiple of 8
 inertial_max_sequence_length = 326
 rgb_max_sequence_length = 96
 depth_max_sequence_length = 128
-skeleton_shape = (skeleton_max_sequence_length, 20, 3)
+skeleton_shape = (skeleton_max_sequence_length, 20, 3, 1)
 inertial_shape = (inertial_max_sequence_length, 6)  # 3x acceleration + 3x rotation
 rgb_shape = (rgb_max_sequence_length, 480, 640, 3)
 depth_shape = (depth_max_sequence_length, 240, 320)
 
-skeleton_center_joint = 2
+skeleton_center_joint = 2  # this is for Kinect1 skeleton
 skeleton_x_joints = (4, 8)
 skeleton_z_joints = (3, 2)
 

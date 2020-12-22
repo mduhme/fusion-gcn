@@ -135,8 +135,8 @@ class Model(nn.Module):
     def __init__(self, data_shape, num_classes, graph, **kwargs):
         super(Model, self).__init__()
 
-        # data_shape = (num_persons, num_frames, num_joints, num_channels)
-        num_persons, _, num_joints, num_channels = data_shape["skeleton"]
+        # data_shape = (num_frames, num_joints, num_channels, num_persons)
+        _, num_joints, num_channels, num_persons = data_shape["skeleton"]
 
         strategy = GraphPartitionStrategy()
         adj = kwargs.get("adjacency_matrix", None)
@@ -145,7 +145,7 @@ class Model(nn.Module):
 
         self.data_bn = nn.BatchNorm1d(num_persons * num_channels * num_joints)
 
-        self.l1 = TCN_GCN_unit(3, 64, adj, residual=False)
+        self.l1 = TCN_GCN_unit(num_channels, 64, adj, residual=False)
         self.l2 = TCN_GCN_unit(64, 64, adj)
         self.l3 = TCN_GCN_unit(64, 64, adj)
         self.l4 = TCN_GCN_unit(64, 64, adj)
@@ -162,10 +162,12 @@ class Model(nn.Module):
 
     def forward(self, x):
         # N, C, T, V, M = x.size()
-        N, M, T, V, C = x.size()
+        # N, M, T, V, C = x.size()
+        N, T, V, C, M = x.size()
 
         # x = x.permute(0, 4, 3, 1, 2).contiguous().view(N, M * V * C, T)
-        x = x.permute(0, 1, 3, 4, 2).contiguous().view(N, M * V * C, T)
+        # x = x.permute(0, 1, 3, 4, 2).contiguous().view(N, M * V * C, T)
+        x = x.permute(0, 4, 2, 3, 1).contiguous().view(N, M * V * C, T)
         x = self.data_bn(x)
         x = x.view(N, M, V, C, T).permute(0, 1, 3, 4, 2).contiguous().view(N * M, C, T, V)
 

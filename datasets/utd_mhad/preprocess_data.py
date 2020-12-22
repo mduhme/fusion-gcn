@@ -17,10 +17,11 @@ def get_configuration() -> argparse.Namespace:
     parser.add_argument("-o", "--out_path", default="../preprocessed_data/UTD-MHAD/", type=str,
                         help="Destination directory for processed data.")
     parser.add_argument("-m", "--modes", type=str, help="Modes (comma-separated) to decide how to process the dataset."
-                                                        " See preprocess_data.py:get_preprocessing_setting")
+                                                        " See config.py for all modes.")
     parser.add_argument("-t", "--target_modality", type=str,
                         help="Name of a modality. "
-                             "All data is sampled to be of the maximum sequence length of the specified modality.")
+                             "All sequences are resampled to be of the "
+                             "maximum sequence length of the specified modality.")
     parser.add_argument("--debug", action="store_true", help="debug mode")
     return parser.parse_args()
 
@@ -67,8 +68,6 @@ def create_labels(out_path: str, data_group: DataGroup, splits: dict):
 
 
 def preprocess(cf: argparse.Namespace):
-    # TODO implement data visualization (matplotlib) via grouper
-
     multi_modal_data_group = create_grouped_data(cf)
 
     # dataset splits

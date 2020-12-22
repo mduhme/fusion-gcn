@@ -154,6 +154,7 @@ class DataGroup:
                          main_modality: Optional[str] = None,
                          modes: Optional[Dict[str, str]] = None,
                          out_path: Optional[str] = None,
+                         split_type: str = "subject",
                          **kwargs):
         """
         Produces features for each modality and stores them under the specified path. If main_modality is None,
@@ -165,6 +166,7 @@ class DataGroup:
         are equal to the maximum sequence length of this modality.
         :param modes: A dictionary of modes for each modality
         :param out_path: Path where results will be stored. If None, return a generator for processed samples.
+        :param split_type: Split subset (e.g. "subject" or "scene")
         that defines the way features of that modality are processed.
         """
         modes, max_sequence_length, processors, required_loaders, interpolators = \
@@ -177,7 +179,7 @@ class DataGroup:
         # Process all modalities for each split
         for split_name, split in splits.items():
             print(f"Split '{split_name}' - Modalities: {', '.join(processors.keys())}")
-            sample_indices = np.flatnonzero(self.data["subject"].isin(split))
+            sample_indices = np.flatnonzero(self.data[split_type].isin(split))
             num_samples = len(sample_indices)
 
             # Map modality to a list of files defined by the split
@@ -205,16 +207,18 @@ class DataGroup:
                 else:
                     return transformed_sample_iter
 
-    def produce_labels(self, splits: Dict[str, tuple] = None) -> Union[np.ndarray, Dict[str, np.ndarray]]:
+    def produce_labels(self, splits: Dict[str, tuple] = None, split_type: str = "subject") \
+            -> Union[np.ndarray, Dict[str, np.ndarray]]:
         """
         Produce labels for each split. If splits is None, return a single array.
 
         :param splits: Dataset splits (e.g. train, validation) with a tuple of subjects (int) that are part of the set
+        :param split_type: Split subset (e.g. "subject" or "scene")
         :return: A single array if splits is None else a dictionary with an array for each split
         """
         if splits is not None:
             return {
-                name: self.data[self.data["subject"].isin(split)]["action"].to_numpy(np.int) for name, split in
+                name: self.data[self.data[split_type].isin(split)]["action"].to_numpy(np.int) for name, split in
                 splits.items()
             }
 

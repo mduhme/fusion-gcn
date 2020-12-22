@@ -2,27 +2,7 @@ from datasets.mmact.constants import *
 
 _skeleton_args = {
     "skeleton_center_joint": skeleton_center_joint,
-    "skeleton_x_joints": skeleton_x_joints,
-    "skeleton_z_joints": skeleton_z_joints
 }
-
-_joint_groups = (  # grouped skeleton joints
-    (0, 1, 2, 3, 4, 8, 12, 16),  # head and torso
-    (4, 5, 6, 7),  # left arm
-    (8, 9, 10, 11),  # right arm
-    (12, 13, 14, 15),  # left leg
-    (16, 17, 18, 19),  # right leg
-)
-
-# margins for the groups above, each is (right, top, bottom, left)
-_default_margin = 16
-_joint_group_box_margins = (
-    (_default_margin, _default_margin * 2, _default_margin, _default_margin),  # head and torso needs more offset at top
-    (_default_margin, _default_margin, _default_margin * 2, _default_margin),  # arm left needs more offset at bottom
-    (_default_margin, _default_margin, _default_margin * 2, _default_margin),  # arm right needs more offset at bottom
-    _default_margin,  # only one margin for all sides (left leg)
-    _default_margin  # only one margin for all sides (right leg)
-)
 
 # noinspection DuplicatedCode
 settings = {
@@ -35,8 +15,9 @@ settings = {
         "modes": {
             "skeleton": "imu_enhanced",
         },
+        "input": ["skeleton", "inertial"],
         "kwargs": {
-            "imu_num_signals": 2,
+            "imu_num_signals": 4,
             **_skeleton_args
         }
     },
@@ -46,59 +27,8 @@ settings = {
         "processors": {
             "skeleton": "skeleton.SkeletonProcessor"
         },
+        "input": ["skeleton"],
         "kwargs": _skeleton_args
-    },
-
-    # Extract RGB patches using Openpose keypoints.
-    # Mode should only be used for iterating over processed samples, not for output.
-    # Writing to a file requires ~150GB for UTD-MHAD for a patch size of 128x128
-    "rgb_patches_op": {
-        "processors": {
-            "rgb": "rgb.RGBVideoProcessor"
-        },
-        "modes": {
-            "rgb": "rgb_openpose_skeleton_patches"
-        }
-    },
-
-    # Extract RGB patches by projecting the skeleton 3D coordinates to 2D RGB coordinates.
-    # Mode should only be used for iterating over processed samples, not for output.
-    "rgb_patches": {
-        "processors": {
-            "rgb": "rgb.RGBVideoProcessor"
-        },
-        "modes": {
-            "rgb": "rgb_skeleton_patches"
-        },
-        "kwargs": {
-            "skeleton_to_rgb_coordinate_transformer": skeleton_to_rgb_transformer,
-
-            # Writing to an uncompressed file requires ~150GB for UTD-MHAD for a patch size of 128x128
-            "rgb_compress_patches": True,
-        }
-    },
-
-    # Extract patches like done for 'rgb_patches_op' and compute feature vector for each patch
-    "rgb_patch_features_op": {
-        "processors": {
-            "rgb": "rgb.RGBVideoProcessor"
-        },
-        "modes": {
-            "rgb": "rgb_openpose_skeleton_patch_features"
-        }
-    },
-
-    "rgb_group_patch_features_op": {
-        "processors": {
-            "rgb": "rgb.RGBVideoProcessor"
-        },
-        "modes": {
-            "rgb": "rgb_openpose_skeleton_patch_features"
-        },
-        "kwargs": {
-            "joint_groups": _joint_groups,
-            "joint_groups_box_margin": _joint_group_box_margins
-        }
     },
 
     # Extract patches like done for 'rgb_patches' and compute feature vector for each patch
@@ -106,32 +36,17 @@ settings = {
         "processors": {
             "rgb": "rgb.RGBVideoProcessor"
         },
+        "input": ["skeleton", "rgb"],
         "modes": {
             "rgb": "rgb_skeleton_patch_features"
         },
-        "kwargs": {
-            "skeleton_to_rgb_coordinate_transformer": skeleton_to_rgb_transformer
-        }
-    },
-
-    "rgb_group_patch_features": {
-        "processors": {
-            "rgb": "rgb.RGBVideoProcessor"
-        },
-        "modes": {
-            "rgb": "rgb_skeleton_patch_features"
-        },
-        "kwargs": {
-            "skeleton_to_rgb_coordinate_transformer": skeleton_to_rgb_transformer,
-            "joint_groups": _joint_groups,
-            "joint_groups_box_margin": _joint_group_box_margins
-        }
     },
 
     "rgb_default": {
         "processors": {
             "rgb": "rgb.RGBVideoProcessor"
         },
+        "input": ["rgb"],
         "kwargs": {
             # Crop options (Set to None or remove for no cropping)
             # (MinX, MaxX, MinY, MaxY), Min is inclusive, Max isn't
@@ -151,7 +66,8 @@ settings = {
     "imu_default": {
         "processors": {
             "inertial": "inertial.InertialProcessor"
-        }
+        },
+        "input": ["inertial"]
     },
 
     "imu_signal_image": {
@@ -160,18 +76,9 @@ settings = {
         },
         "modes": {
             "inertial": "signal_image"
-        }
-    },
-
-    # extract 2D bounding boxes from openpose skeletons
-    "op_bb": {
-        "processors": {
-            "skeleton": "skeleton.SkeletonProcessor"
         },
-        "modes": {
-            "skeleton": "op_bb"
-        }
-    },
+        "input": ["inertial"]
+    }
 }
 
 

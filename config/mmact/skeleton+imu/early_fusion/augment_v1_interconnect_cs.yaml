@@ -29,9 +29,9 @@ optimizer_args:
 lr_scheduler: multistep
 lr_scheduler_args:
   milestones:
-    - 30
-    - 40
+    - 20
+    - 28
   gamma: 0.1
 
 batch_size: 8
-epochs: 50
+epochs: 35

@@ -1,9 +1,10 @@
 # Configuration using Skeleton+IMU data combined
 # IMU signals (e.g. acc, gyro) are appended to the skeleton as additional joints
 # For V1: IMU joints are appended to the skeleton center joint which typically is the shoulder/chest center
+# interconnect: All imu joints have connections to each other
 
 input_data:
-  - path: ..\preprocessed_data\MMAct\skeleton_imu_enhanced\cross_subject
+  - path: ..\preprocessed_data\MMAct\skeleton_imu_enhanced\cross_view
     loader: NumpyDatasetLoader
 
 out_path: ..\models\mmargcn\MMAct
@@ -16,6 +17,7 @@ mode: skeleton_imu_enhanced
 model_args:
   num_imu_joints: 4
   imu_enhanced_mode: append_center
+  interconnect_imu_joints: True
 
 base_lr: 0.1
 optimizer: SGD
@@ -27,9 +29,9 @@ optimizer_args:
 lr_scheduler: multistep
 lr_scheduler_args:
   milestones:
-    - 30
-    - 40
+    - 20
+    - 28
   gamma: 0.1
 
 batch_size: 8
-epochs: 50
+epochs: 35

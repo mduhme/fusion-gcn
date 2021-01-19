@@ -271,7 +271,7 @@ def preprocess(cf: argparse.Namespace):
             print(f"Shrinking '{file.path}'...")
             os.rename(file.path, file.path + ".old")
             arr = np.load(file.path + ".old", mmap_mode="r")
-            np.save(file.path, arr[:, ::cf.shrink])
+            np.save(file.path, arr[:, :, ::cf.shrink])
             del arr
             os.remove(file.path + ".old")
 

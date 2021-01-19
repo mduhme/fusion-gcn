@@ -131,14 +131,18 @@ def normalize_skeleton(skeleton: np.ndarray, origin_joint: int, z_axis_joints: T
     """
     skeleton = pad_null_frames(skeleton)
     skeleton = move_skeleton_origin(skeleton, origin_joint)
-    try:
-        skeleton = parallelize_joints_to_axis(skeleton, z_axis_joints, (0, 0, 1))
-    except InvalidSkeletonException:
-        pass
-    try:
-        skeleton = parallelize_joints_to_axis(skeleton, x_axis_joints, (1, 0, 0))
-    except InvalidSkeletonException:
-        pass
+
+    if z_axis_joints:
+        try:
+            skeleton = parallelize_joints_to_axis(skeleton, z_axis_joints, (0, 0, 1))
+        except InvalidSkeletonException:
+            pass
+
+    if x_axis_joints:
+        try:
+            skeleton = parallelize_joints_to_axis(skeleton, x_axis_joints, (1, 0, 0))
+        except InvalidSkeletonException:
+            pass
     return skeleton
 
 

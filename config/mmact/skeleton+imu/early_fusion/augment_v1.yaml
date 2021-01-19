@@ -14,7 +14,7 @@ fixed_seed: 1
 
 mode: skeleton_imu_enhanced
 model_args:
-  num_imu_joints: 2
+  num_imu_joints: 4
   imu_enhanced_mode: append_center
 
 base_lr: 0.1

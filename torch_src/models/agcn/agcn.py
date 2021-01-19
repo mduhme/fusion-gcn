@@ -145,7 +145,7 @@ class Model(nn.Module):
 
         self.data_bn = nn.BatchNorm1d(num_persons * num_channels * num_joints)
 
-        self.l1 = TCN_GCN_unit(3, 64, adj, residual=False)
+        self.l1 = TCN_GCN_unit(num_channels, 64, adj, residual=False)
         self.l2 = TCN_GCN_unit(64, 64, adj)
         self.l3 = TCN_GCN_unit(64, 64, adj)
         self.l4 = TCN_GCN_unit(64, 64, adj)

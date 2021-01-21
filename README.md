@@ -63,8 +63,6 @@ with `<dataset>` being either *utd_mhad* or *mmact*.
 > - Running in PyCharm: Mark directory 'torch_src' as *Sources Root*  
 > - Running in command line: Add `<project directory>` to PYTHONPATH  
 
-**Right now, everything only tested for UTD-MHAD!**
-
 1. Preprocess dataset:  
 ```
 ./datasets/<dataset>/preprocess_data.py

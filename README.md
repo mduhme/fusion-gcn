@@ -89,6 +89,8 @@ Look at the parameter `input_data` in any configuration file under `<project dir
      :warning: **This uses the faulty original skeleton to RGB mapping and should not be used.**
    - **rgb_group_patch_features**: Same as *rgb_group_patch_features_op* but retrieve coordinates like in *rgb_patch_features*.  
      :warning: **Deprecated and not used for any training configuration anymore** | **This uses the faulty original skeleton to RGB mapping and should not be used.**
+- Argument `t` specifies the target modality and should only be used with at least two modes.  
+  If set to *skeleton*, all sequences of other modalities are resampled to be of the same length as skeleton modality.
 - Argument `split` is only usable with MMAct and must not be used for UTD-MHAD. 
   Possible values are *cross_subject* and *cross_view*.
 

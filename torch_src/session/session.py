@@ -6,8 +6,8 @@ import torch
 from torch.utils.data import DataLoader
 
 import session_helper
-from config import load_and_merge_configuration, copy_configuration_to_output
-from metrics import MultiClassAccuracy, TopKAccuracy, SimpleMetric, ConfusionMatrix, AccuracyBarChart
+from config import copy_configuration_to_output
+from metrics import MultiClassAccuracy, TopKAccuracy, SimpleMetric, ConfusionMatrix, AccuracyBarChart, Mean
 from progress import ProgressLogger, MetricsContainer
 from session.procedures.batch_train import BatchProcessor
 from util.dynamic_import import import_model, import_dataset_constants
@@ -22,21 +22,13 @@ class Session:
     def __init__(self, base_config, session_type: str):
         self._base_config = base_config
         self.session_type = session_type
-        if self._base_config.session_id is not None:
-            self.session_id = self._base_config.session_id
-            self._is_resume = True
-        else:
-            self._is_resume = False
-            mode_id = os.path.splitext(os.path.basename(self._base_config.file))[0]
-            self.session_id = time.strftime(f"{self.session_type}_%Y_%m_%d-%H_%M_%S_{mode_id}")
+        mode_id = os.path.splitext(os.path.basename(self._base_config.file))[0]
+        self.session_id = time.strftime(f"{self.session_type}_%Y_%m_%d-%H_%M_%S_{mode_id}")
 
         self.out_path = os.path.join(self._base_config.out_path, self.session_id)
         self.log_path = os.path.join(self.out_path, "logs")
         self.checkpoint_path = os.path.join(self.out_path, "checkpoints")
         self.config_path = os.path.join(self.out_path, "config.yaml")
-
-        if self._is_resume and os.path.exists(self.config_path):
-            load_and_merge_configuration(self._base_config, self.config_path)
 
         self.disable_logging = self._base_config.disable_logging
         self.disable_checkpointing = self._base_config.disable_checkpointing
@@ -113,8 +105,7 @@ class Session:
         copy_configuration_to_output(self._base_config.file, self.out_path)
         # save_configuration(self._base_config, self.config_path)
 
-    @staticmethod
-    def build_metrics(num_classes: int, class_labels=None, k: int = 5,
+    def build_metrics(self, num_classes: int, class_labels=None, k: int = 5,
                       additional_metrics: dict = None) -> MetricsContainer:
         """
         Build different metrics. Metrics that are always included are learning rate, loss and accuracy.
@@ -128,34 +119,46 @@ class Session:
         # https://medium.com/data-science-in-your-pocket/calculating-precision-recall-for-multi-class-classification-9055931ee229
         # https://towardsdatascience.com/multi-class-metrics-made-simple-part-i-precision-and-recall-9250280bddc2?gi=a28f7efba99e
 
-        metrics_list = [
-            MultiClassAccuracy("training_accuracy"),
-            MultiClassAccuracy("validation_accuracy")
-        ]
+        is_eval = self.session_type == "evaluation"
+        metrics_list = []
+
+        if not is_eval:
+            metrics_list.append(Mean("training_loss"))
+        metrics_list.append(Mean("validation_loss"))
+
+        if not is_eval:
+            metrics_list.append(MultiClassAccuracy("training_accuracy"))
+
+        metrics_list.append(MultiClassAccuracy("validation_accuracy"))
 
         conf_a = ConfusionMatrix(num_classes, "validation_confusion", class_labels=class_labels)
         conf_b = ConfusionMatrix(num_classes, "training_confusion", class_labels=class_labels)
-        conf_a.write_to_summary_interval = 10
-        conf_b.write_to_summary_interval = 10
+        conf_a.write_to_summary_interval = 1 if is_eval else 5
+        conf_b.write_to_summary_interval = 1 if is_eval else 5
 
-        metrics_list.append(conf_a)
+        if not is_eval:
+            metrics_list.append(conf_a)
         metrics_list.append(conf_b)
 
-        chart = AccuracyBarChart(num_classes, "train_val_diff", class_labels)
-        chart.write_to_summary_interval = 10
-        metrics_list.append(chart)
+        if not is_eval:
+            chart = AccuracyBarChart(num_classes, "train_val_diff", class_labels)
+            chart.write_to_summary_interval = 5
+            metrics_list.append(chart)
 
         if k > 1:
-            metrics_list.append(TopKAccuracy(f"training_top{k}_accuracy", k=k))
+            if not is_eval:
+                metrics_list.append(TopKAccuracy(f"training_top{k}_accuracy", k=k))
             metrics_list.append(TopKAccuracy(f"validation_top{k}_accuracy", k=k))
 
         if additional_metrics:
             for metric_name in additional_metrics:
                 c = additional_metrics[metric_name]
-                metrics_list.append(c(f"training_{metric_name}"))
+                if not is_eval:
+                    metrics_list.append(c(f"training_{metric_name}"))
                 metrics_list.append(c(f"validation_{metric_name}"))
 
-        metrics_list.append(SimpleMetric("lr"))
+        if not is_eval:
+            metrics_list.append(SimpleMetric("lr"))
         return MetricsContainer(metrics_list)
 
     @staticmethod
@@ -186,7 +189,7 @@ class Session:
 
     @staticmethod
     def validate_epoch(batch_processor: BatchProcessor, model: torch.nn.Module, loss_function: torch.nn.Module,
-                       dataset: DataLoader, progress: ProgressLogger, metrics: MetricsContainer):
+                       dataset: DataLoader, progress: ProgressLogger, metrics: MetricsContainer, mode: int = 1):
         """
         Validate a single epoch by running over all validation batches.
         """
@@ -202,7 +205,7 @@ class Session:
                                                      metrics.update_validation)
                 # Update progress bar
                 if progress:
-                    progress.update_epoch_mode(1, metrics=metrics.format_all())
+                    progress.update_epoch_mode(mode, metrics=metrics.format_all())
 
     def __str__(self):
         return self.session_id

@@ -81,7 +81,7 @@ class TrainingSession(Session):
                 "loss_function": loss_function,
                 "lr_scheduler": lr_scheduler
             })
-        metrics = Session.build_metrics(num_classes, class_labels=self._base_config.class_labels)
+        metrics = self.build_metrics(num_classes, class_labels=self._base_config.class_labels)
 
         if progress:
             self.print_summary(model, **kwargs)

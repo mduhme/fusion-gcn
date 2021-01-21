@@ -236,14 +236,6 @@ class MetricsContainer:
         self._training_metrics = [m for m in metrics if "train" in m.name and "loss" not in m.name]
         self._validation_metrics = [m for m in metrics if "val" in m.name and "loss" not in m.name]
 
-        if self.validation_loss is None:
-            self.validation_loss = Mean("validation_loss")
-            self._metrics = [self.validation_loss] + self._metrics
-
-        if self.training_loss is None:
-            self.training_loss = Mean("training_loss")
-            self._metrics = [self.training_loss] + self._metrics
-
         self._training_format_metrics = MetricsContainer._log_metrics(self.training_loss, *self._training_metrics)
         self._validation_format_metrics = MetricsContainer._log_metrics(self.validation_loss, *self._validation_metrics)
         self._progress_metrics = MetricsContainer._log_metrics(*self._metrics)

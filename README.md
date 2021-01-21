@@ -95,7 +95,18 @@ Look at the parameter `input_data` in any configuration file under `<project dir
 2. Create (or use existing) training/evaluation configuration under `./config/<dataset>/`.
 
 3. Run `./torch_src/main.py -f ./config/<dataset>/**.yaml` using any configuration.  
-   Manipulation hyperparameters using command line is also possible. View options by running `./torch_src/main.py --help`.
+   Manipulation hyperparameters using command line is also possible. View options by running `./torch_src/main.py --help`.  
+   By default, the session type is *training* which trains the network and evaluates metrics for each epoch. 
+   Alternatively, session type can be set to *evaluation* to load weights of a 
+   training session and quickly recompute metrics (validation accuracy, confusion matrix, etc.) for those weights.  
+   Example: Given training session with weights in `/models/mmargcn/UTD-MHAD/training_2020_12_12-15_56_44_agcn/` 
+   for config `/<project directory>/config/utd-mhad/skeleton/agcn.yaml`, to set the session type, run:
+```
+./torch_src/main.py
+-f config/utd-mhad/skeleton/agcn.yaml 
+--session_type=evaluation 
+--eval_session_id=training_2020_12_12-15_56_44_agcn
+```
 
 
 ## Code

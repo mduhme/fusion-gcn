@@ -110,7 +110,8 @@ def get_configuration(session_types: tuple, optimizer_choices: tuple,
     parser.add_argument("--fixed_seed", type=int, help="Set a fixed seed for all random functions.")
     parser.add_argument("--in_memory", action="store_true",
                         help="Load all datasets into main memory instead of mapping them.")
-    parser.add_argument("--session_id", type=str, help="If given, resume the session with the given id.")
+    parser.add_argument("--eval_session_id", type=str, help="For evaluation only: "
+                                                            "evaluate specified session using its model weights.")
     config = parser.parse_args()
 
     # Load (and possibly overwrite) configuration from file

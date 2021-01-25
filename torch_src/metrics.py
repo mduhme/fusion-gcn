@@ -3,6 +3,7 @@ Different types of metrics which appear in log or tensorboard.
 Some code is taken and modified from ignite.metrics library.
 """
 
+import sys
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Sequence, Union
 
@@ -136,6 +137,101 @@ class TopKAccuracy(ScalarMetric):
     def reset(self):
         self._num_correct = 0.
         self._num_examples = 0
+
+
+def to_onehot(indices: torch.Tensor, num_classes: int) -> torch.Tensor:
+    onehot = torch.zeros(indices.shape[0], num_classes, *indices.shape[1:], dtype=torch.uint8, device=indices.device)
+    return onehot.scatter_(1, indices.unsqueeze(1), 1)
+
+
+class PrecisionRecallBase(ScalarMetric, ABC):
+    def __init__(self, name: str):
+        super().__init__(name)
+        self._true_positives = 0
+        self._positives = 0
+
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
+        y_pred, y_true = val
+        num_classes = y_pred.size(1)
+        indices = torch.argmax(y_pred, dim=1)
+        y_true = to_onehot(y_true, num_classes=num_classes)
+        y_pred = to_onehot(indices, num_classes=num_classes)
+        y_true = y_true.to(y_pred)
+        correct = y_true * y_pred
+        self.update_impl(y_pred, y_true, correct)
+
+    @abstractmethod
+    def update_impl(self, y_pred, y_true, correct):
+        pass
+
+    def get_tensor(self) -> torch.Tensor:
+        # noinspection PyTypeChecker
+        return self._true_positives / (self._positives + sys.float_info.epsilon)
+
+    @property
+    def value(self) -> float:
+        return self.get_tensor().mean().item()
+
+    def reset(self):
+        self._true_positives = 0
+        self._positives = 0
+
+
+class Precision(PrecisionRecallBase):
+    def __init__(self, name: str = "precision"):
+        super().__init__(name)
+
+    def update_impl(self, y_pred, y_true, correct):
+        all_positives = y_pred.sum(dim=0).type(torch.DoubleTensor)
+        if correct.sum() == 0:
+            true_positives = torch.zeros_like(all_positives)
+        else:
+            true_positives = correct.sum(dim=0)
+
+        true_positives = true_positives.type(torch.DoubleTensor)
+        self._true_positives += true_positives
+        self._positives += all_positives
+
+
+class Recall(PrecisionRecallBase):
+    def __init__(self, name: str = "recall"):
+        super().__init__(name)
+
+    def update_impl(self, y_pred, y_true, correct):
+        actual_positives = y_true.sum(dim=0).type(torch.DoubleTensor)
+        if correct.sum() == 0:
+            true_positives = torch.zeros_like(actual_positives)
+        else:
+            true_positives = correct.sum(dim=0)
+
+        true_positives = true_positives.type(torch.DoubleTensor)
+        self._true_positives += true_positives
+        self._positives += actual_positives
+
+
+class F1MeasureMetric(ScalarMetric):
+    def __init__(self, name: str = "f-measure"):
+        super().__init__(name)
+        # from ignite.metrics import Precision, Recall, Fbeta
+        self.precision = Precision()
+        self.recall = Recall()
+        # self.f1 = Fbeta(1, precision=self.precision, recall=self.recall)
+
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
+        self.precision.update(val)
+        self.recall.update(val)
+
+    @property
+    def value(self) -> float:
+        p = self.precision.get_tensor()
+        r = self.recall.get_tensor()
+        f = ((p * r * 2) / (p + r + 1e-15)).mean().item()
+        return f
+        # return self.f1.compute()
+
+    def reset(self):
+        self.precision.reset()
+        self.recall.reset()
 
 
 class VisualMetric(Metric):

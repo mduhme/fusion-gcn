@@ -9,6 +9,7 @@ from dataset import MultiModalDataset
 from progress import ProgressLogger
 from session.procedures.batch_train import get_batch_processor_from_config
 from session.session import Session
+from metrics import F1MeasureMetric
 
 
 class EvaluationSession(Session):
@@ -53,7 +54,9 @@ class EvaluationSession(Session):
         model, loss_function, _, _ = self._build_model(config, data_shape, num_classes)
         model.load_state_dict(torch.load(eval_session_path))
         progress = self._build_logging(len(validation_data))
-        metrics = self.build_metrics(num_classes, class_labels=self._base_config.class_labels)
+        metrics = self.build_metrics(num_classes, class_labels=self._base_config.class_labels, additional_metrics={
+            "f1_measure": F1MeasureMetric
+        })
 
         if progress:
             self.print_summary(model, **kwargs)

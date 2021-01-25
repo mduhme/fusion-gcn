@@ -12,7 +12,7 @@ dataset: MMAct
 session_type: training
 fixed_seed: 1
 
-mode: skeleton_imu_enhanced
+mode: skeleton_imu_spatial_fusion
 model_args:
   num_imu_joints: 4
   imu_enhanced_mode: append_center

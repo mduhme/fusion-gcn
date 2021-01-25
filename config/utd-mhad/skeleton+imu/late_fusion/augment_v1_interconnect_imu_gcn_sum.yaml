@@ -23,7 +23,7 @@ model_args:
   num_signals: 2
   gc_model: agcn
   fusion: sum
-  skeleton_imu_enhanced: True
+  skeleton_imu_spatial_fusion: True
 
 base_lr: 0.001
 optimizer: ADAM

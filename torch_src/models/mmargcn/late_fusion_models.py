@@ -48,7 +48,7 @@ class SkeletonImuGCN(nn.Module):
         num_layers = kwargs.get("num_layers", 10)
         dropout = kwargs.get("dropout", 0.)
         fusion_type = kwargs.get("fusion", "concatenate")
-        if kwargs.pop("skeleton_imu_enhanced", False):
+        if kwargs.pop("skeleton_imu_spatial_fusion", False):
             graph = get_skeleton_imu_fusion_graph(graph, **kwargs)
         self.imu_gcn = imu_models.ImuGCN(data_shape, num_classes, inter_signal_back_connections=True,
                                          include_additional_top_layer=True, without_fc=True, **kwargs)

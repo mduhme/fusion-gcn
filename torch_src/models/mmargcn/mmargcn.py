@@ -36,7 +36,8 @@ class Model(nn.Module):
             # ------------------------------------------------------
             # ----------------    SKELETON + IMU    ----------------
             # ------------------------------------------------------
-            "skeleton_imu_enhanced": early_fusion_models.SkeletonImuEnhancedModel,
+            "skeleton_imu_spatial_fusion": early_fusion_models.SkeletonImuSpatialFusionModel,
+            "skeleton_imu_channel_fusion": early_fusion_models.SkeletonImuChannelFusionModel,
             "skeleton_imu_gcn_late_fusion": late_fusion_models.SkeletonImuGCN,
 
             # ------------------------------------------------------

@@ -1,0 +1,26 @@
+
+input_data:
+  - path: ..\preprocessed_data\UTD-MHAD\skeleton_default__imu_default
+    loader: NumpyDatasetLoader
+    loader_args:
+      in_memory: True
+
+out_path: ..\models\mmargcn\UTD-MHAD
+model: mmargcn
+dataset: UTD-MHAD
+session_type: training
+fixed_seed: 4
+
+mode: skeleton_imu_channel_fusion
+
+base_lr: 0.001
+optimizer: ADAM
+optimizer_args:
+  weight_decay: 0.01
+
+lr_scheduler: cawr
+lr_scheduler_args:
+  T_0: 20
+
+batch_size: 8
+epochs: 60

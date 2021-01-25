@@ -6,7 +6,7 @@ from models.mmargcn.fusion import get_fusion, get_skeleton_imu_fusion_graph
 from models.mmargcn.rgb_feature_models import RgbCnnEncoder, RgbR2P1DEncoder
 
 
-class SkeletonImuEnhancedModel(nn.Module):
+class SkeletonImuSpatialFusionModel(nn.Module):
     """
     Take skeleton data with additional joints for each imu modality and append them to different parts of the skeleton.
     """
@@ -19,6 +19,29 @@ class SkeletonImuEnhancedModel(nn.Module):
                                without_fc=kwargs.get("without_fc", False))
 
     def forward(self, x):
+        return self.agcn(x)
+
+
+class SkeletonImuChannelFusionModel(nn.Module):
+    """
+    Extend skeleton data's channel by broadcasting imu data to each node.
+    """
+
+    def __init__(self, data_shape, num_classes: int, graph, **kwargs):
+        super().__init__()
+        num_layers = kwargs.get("num_layers", 10)
+        shape = list(data_shape["skeleton"])
+        shape[-1] += data_shape["inertial"][-1]  # add imu channels to shape
+        self.fusion = get_fusion("concatenate", concatenate_dim=-1)
+        self.agcn = agcn.Model(tuple(shape), num_classes, graph, num_layers=num_layers,
+                               without_fc=kwargs.get("without_fc", False))
+
+    def forward(self, x):
+        skeleton_data = x["skeleton"]
+        imu_data = x["inertial"]
+        imu_data = imu_data.unsqueeze(1).unsqueeze(3)  # add dimension for num_bodies and num_nodes
+        imu_data = imu_data.expand(-1, skeleton_data.shape[1], -1, skeleton_data.shape[3], -1)  # repeat values
+        x = self.fusion.combine(skeleton_data, imu_data)
         return self.agcn(x)
 
 

@@ -46,7 +46,7 @@ ROOT
 │   |   └───UTD-MHAD
 ```
 3. OpenPose skeletons for both datasets (BODY_25 for UTD-MHAD and COCO for MMAct) are required for both datasets.
-   They can be downloaded at https://owncloud.uni-koblenz.de/s/aq72Xnddji87QpZ 
+   They can be downloaded at https://agas.uni-koblenz.de/margcn/ 
    or generated using tools in `<project directory>/tools/openpose/gen_openpose_skeletons.py`
 ```
 ./tools/openpose/gen_openpose_skeletons.py
@@ -54,9 +54,11 @@ ROOT
 --openpose_binary_path=<path_to_openpose_binaries>
 --openpose_python_pyth=<path_to_openpose_python_files>
 ```
-with `<dataset>` being either *utd_mhad* or *mmact*.
-4. Create a new python environment (Code tested for Python 3.8.5 and CUDA 10.2)
-5. Install requirements: `pip install -r requirements.txt`
+with `<dataset>` being either *utd_mhad* or *mmact*.  
+
+4. Create a new python environment (Code tested for Python 3.8.5 and CUDA 10.2  
+   
+5. Install requirements: `pip install -r requirements.txt`  
 
 ## Preprocessing and Training
 

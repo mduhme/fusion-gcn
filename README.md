@@ -2,7 +2,9 @@
 
 ## Setup
 
-1. Create the following directory structure for ease of use and clone the project to `<project directory>`:  
+1. Download data for one or all of supported datasets: [UTD-MAD](https://personal.utdallas.edu/~kehtar/UTD-MHAD.html) and [MMAct](https://mmact19.github.io/2019/).
+
+2. Create the following directory structure for ease of use and clone the project to `<project directory>`:  
    You may also run `./<project directory>/tools/create_directory_structure.py` with ROOT as working directory
    to create the remaining directories.
 ```
@@ -43,7 +45,7 @@ ROOT
 |   |   └───MMAct
 │   |   └───UTD-MHAD
 ```
-2. OpenPose skeletons for both datasets (BODY_25 for UTD-MHAD and COCO for MMAct) are required for both datasets.
+3. OpenPose skeletons for both datasets (BODY_25 for UTD-MHAD and COCO for MMAct) are required for both datasets.
    They can be downloaded at https://owncloud.uni-koblenz.de/s/aq72Xnddji87QpZ 
    or generated using tools in `<project directory>/tools/openpose/gen_openpose_skeletons.py`
 ```
@@ -53,8 +55,8 @@ ROOT
 --openpose_python_pyth=<path_to_openpose_python_files>
 ```
 with `<dataset>` being either *utd_mhad* or *mmact*.
-3. Create a new python environment (Code tested for Python 3.8.5 and CUDA 10.2)
-4. Install requirements: `pip install -r requirements.txt`
+4. Create a new python environment (Code tested for Python 3.8.5 and CUDA 10.2)
+5. Install requirements: `pip install -r requirements.txt`
 
 ## Preprocessing and Training
 

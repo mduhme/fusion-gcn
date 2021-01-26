@@ -33,7 +33,7 @@ def _is_valid_file(file: str) -> bool:
 
 def get_files(data_path: str, repeat_view: int = 0) -> Sequence[FileMetaData]:
     out_files = []
-    for root, _, files in os.walk(data_path):
+    for root, _, files in os.walk(data_path, followlinks=True):
         rel_root = os.path.relpath(root, data_path)
 
         for name in files:

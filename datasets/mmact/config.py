@@ -7,7 +7,7 @@ _skeleton_args = {
 # noinspection DuplicatedCode
 settings = {
     # Mode skeleton_imu_enhanced:
-    # Combine skeleton and IMU data (extend skeleton by 2 joints -> Acc xyz and Gyro xyz
+    # Combine skeleton and IMU data (extend skeleton by 4 joints -> 2x acc xyz, gyro xyz and orientation xyz)
     "skeleton_imu_enhanced": {
         "processors": {
             "skeleton": "skeleton.SkeletonProcessor",
@@ -42,26 +42,21 @@ settings = {
         },
     },
 
-    "rgb_default": {
-        "processors": {
-            "rgb": "rgb.RGBVideoProcessor"
-        },
-        "input": ["rgb"],
-        "kwargs": {
-            # Crop options (Set to None or remove for no cropping)
-            # (MinX, MaxX, MinY, MaxY), Min is inclusive, Max isn't
-            "rgb_crop_square": (100, 480, 100, 480),
-
-            # Resize options (Set to desired size or to original size for no resizing)
-            "rgb_output_size": (96, 96),
-            "rgb_output_fps": 15,
-            "rgb_resize_interpolation": None,  # None = Linear interpolation
-            "rgb_normalize_image": True,  # normalize so that mean=0 and std=1
-
-            # True: save numpy array (possibly large), False: encode multiple video files
-            "rgb_output_numpy": True,
-        }
-    },
+    # "rgb_default": {
+    #     "processors": {
+    #         "rgb": "rgb.RGBVideoProcessor"
+    #     },
+    #     "input": ["rgb"],
+    #     "kwargs": {
+    #         # Resize options (Set to desired size or to original size for no resizing)
+    #         "rgb_output_size": (96, 96),
+    #         "rgb_output_fps": 30,
+    #         "rgb_resize_interpolation": None,  # None = Linear interpolation
+    #         "rgb_normalize_image": True,  # normalize so that mean=0 and std=1
+    #         # True: save numpy array (possibly large), False: encode multiple video files
+    #         "rgb_output_numpy": True,
+    #     }
+    # },
 
     "imu_default": {
         "processors": {

@@ -27,7 +27,7 @@ _joint_group_box_margins = (
 # noinspection DuplicatedCode
 settings = {
     # Mode skeleton_imu_enhanced:
-    # Combine skeleton and IMU data (extend skeleton by 2 joints -> Acc xyz and Gyro xyz
+    # Combine skeleton and IMU data (extend skeleton by 2 joints -> acc xyz and gyro xyz)
     "skeleton_imu_enhanced": {
         "processors": {
             "skeleton": "skeleton.SkeletonProcessor",

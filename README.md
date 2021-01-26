@@ -56,7 +56,7 @@ ROOT
 ```
 with `<dataset>` being either *utd_mhad* or *mmact*.  
 
-4. Create a new python environment (Code tested for Python 3.8.5 and CUDA 10.2  
+4. Create a new python environment (Code tested for Python 3.8.5 and CUDA 10.2)  
    
 5. Install requirements: `pip install -r requirements.txt`  
 
@@ -81,16 +81,16 @@ with `<dataset>` being either *utd_mhad* or *mmact*.
 The modality is the prefix (e.g. "rgb_"). Only specify one mode per modality.  
 Look at the parameter `input_data` in any configuration file under `<project directory>/config/**.yaml` which modes are required for a specific training configuration.
    - **skeleton_default** (default mode): Default processing for skeleton (just normalization).
-   - **rgb_default**: Default processing for RGB (cropping and resizing).
+   - **rgb_default**: Default processing for RGB (cropping and resizing). Not implemented for MMAct.
    - **imu_default**: Default processing for IMU (just normalization).
    - **skeleton_imu_enhanced**: Add IMU (acc and gyro for UTD-MHAD; 2x acc, 1x gyro, 1x ori for MMAct) as additional skeleton joints
-   - **rgb_patch_features_op**: Instead of mapping the dataset skeleton joints, use precomputed Openpose 2D skeletons to extract patches FOR EACH JOINT. The patches are fed to a 2D CNN to compute a vector embedding for each patch.
-   - **rgb_group_patch_features_op**: Same as *rgb_patch_features_op* but instead of extracting patches for each joint, extract patches for groups of joints (5 groups: Torso, Left/Right Arm, Left/Right Leg)  
+   - **rgb_patch_features_op**: Instead of mapping the dataset skeleton joints, use precomputed Openpose 2D skeletons to extract patches FOR EACH JOINT. The patches are fed to a 2D CNN to compute a vector embedding for each patch. (UTD-MHAD only)
+   - **rgb_group_patch_features_op**: Same as *rgb_patch_features_op* but instead of extracting patches for each joint, extract patches for groups of joints (5 groups: Torso, Left/Right Arm, Left/Right Leg) (UTD-MHAD only)  
      :warning: **Deprecated and not used for any training configuration anymore**
    - **rgb_patch_features**: Maps skeleton joints to 2D RGB coordinates to extract patches at these coordinates. The patches are fed to a 2D CNN to compute a vector embedding for each patch.  
-     :warning: **This uses the faulty original skeleton to RGB mapping and should not be used.**
+     :warning: **FOR UTD-MHAD: This uses the faulty original skeleton to RGB mapping and should not be used.**
    - **rgb_group_patch_features**: Same as *rgb_group_patch_features_op* but retrieve coordinates like in *rgb_patch_features*.  
-     :warning: **Deprecated and not used for any training configuration anymore** | **This uses the faulty original skeleton to RGB mapping and should not be used.**
+     :warning: **Deprecated and not used for any training configuration anymore**
 - Argument `t` specifies the target modality and should only be used with at least two modes.  
   If set to *skeleton*, all sequences of other modalities are resampled to be of the same length as skeleton modality.
 - Argument `split` is only usable with MMAct and must not be used for UTD-MHAD. 

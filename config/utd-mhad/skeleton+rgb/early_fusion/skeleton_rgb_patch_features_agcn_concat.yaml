@@ -4,10 +4,10 @@
 # Fusion method: Vector concatenation
 
 input_data:
-  - path: ..\preprocessed_data\UTD-MHAD\skeleton_default__rgb_patch_features_op
+  - path: ../preprocessed_data/UTD-MHAD/skeleton_default__rgb_patch_features_op
     loader: NumpyDatasetLoader
 
-out_path: ..\models\mmargcn\UTD-MHAD
+out_path: ../models/mmargcn/UTD-MHAD
 model: mmargcn
 dataset: UTD-MHAD
 session_type: training

@@ -4,10 +4,10 @@
 # interconnect: All imu joints have connections to each other
 
 input_data:
-  - path: ..\preprocessed_data\MMAct\skeleton_imu_enhanced\cross_subject
+  - path: ../preprocessed_data/MMAct/skeleton_imu_enhanced/cross_subject
     loader: NumpyDatasetLoader
 
-out_path: ..\models\mmargcn\MMAct
+out_path: ../models/mmargcn/MMAct
 model: mmargcn
 dataset: MMAct
 session_type: training

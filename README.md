@@ -18,20 +18,20 @@ ROOT
 └───unprocessed_data 
 |   |
 │   └───MMAct
-│   |   └───acc_phone_clip
-│   |   └───acc_watch_clip
-│   |   └───gyro_clip
+│   |   └───acc_phone_clip       // include 'invalid_files.txt' from MMAct_sensor_invalid_files.tar.gz
+│   |   └───acc_watch_clip       // include 'invalid_files.txt' from MMAct_sensor_invalid_files.tar.gz
+│   |   └───gyro_clip            // include 'invalid_files.txt' from MMAct_sensor_invalid_files.tar.gz
 │   |   └───OpenPose
-|   |   |   └───COCO             // Generate skeletons or paste content of MMACT_OPENPOSE_COCO.7z
+|   |   |   └───COCO             // Generate skeletons or paste content of MMACT_OPENPOSE_COCO.tar.gz
 |   |   |
-│   |   └───orientation_clip
+│   |   └───orientation_clip     // include 'invalid_files.txt' from MMAct_sensor_invalid_files.tar.gz
 │   |   └───RGB
 |   |
 │   └───UTD-MHAD
 │   |   └───Depth
 │   |   └───Inertial
 │   |   └───OpenPose
-|   |   |   └───BODY_25          // Generate skeletons or paste content of UTD-MHAD_OPENPOSE_BODY_25.7z
+|   |   |   └───BODY_25          // Generate skeletons or paste content of UTD-MHAD_OPENPOSE_BODY_25.tar.gz
 |   |   |
 │   |   └───RGB
 │   |   └───Skeleton
@@ -45,8 +45,8 @@ ROOT
 |   |   └───MMAct
 │   |   └───UTD-MHAD
 ```
-3. OpenPose skeletons for both datasets (BODY_25 for UTD-MHAD and COCO for MMAct) are required for both datasets.
-   They can be downloaded at https://agas.uni-koblenz.de/margcn/ 
+3. Include 'invalid_files.txt' for MMAct and OpenPose skeletons for both datasets (BODY_25 for UTD-MHAD and COCO for MMAct) are required for both datasets.
+   They can be downloaded [here](https://agas.uni-koblenz.de/margcn/) or [here](https://drive.google.com/drive/folders/1q_tSzk7EspZwzDwHF925_XOC3QXQqW7n?usp=sharing).
    or generated using tools in `<project directory>/tools/openpose/gen_openpose_skeletons.py`
 ```
 ./tools/openpose/gen_openpose_skeletons.py

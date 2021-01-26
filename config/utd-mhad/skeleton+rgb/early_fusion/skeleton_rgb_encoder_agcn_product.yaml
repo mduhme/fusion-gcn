@@ -4,10 +4,10 @@
 # Fusion method: vector elementwise product
 
 input_data:
-  - path: ..\preprocessed_data\UTD-MHAD\skeleton_default__rgb_default
+  - path: ../preprocessed_data/UTD-MHAD/skeleton_default__rgb_default
     loader: NumpyDatasetLoader
 
-out_path: ..\models\mmargcn\UTD-MHAD
+out_path: ../models/mmargcn/UTD-MHAD
 model: mmargcn
 dataset: UTD-MHAD
 session_type: training

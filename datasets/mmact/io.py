@@ -49,7 +49,6 @@ def get_files(data_path: str, repeat_view: int = 0) -> Sequence[FileMetaData]:
                         setattr(file2, "cam", i)
                         out_files.append(file2)
 
-
     return out_files
 
 

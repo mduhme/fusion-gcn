@@ -1,5 +1,7 @@
 # Multimodal Action Recognition using Graph Convolutional Neural Networks
 
+Code for my master thesis.
+
 ## Setup
 
 1. Download data for one or all of supported datasets: [UTD-MAD](https://personal.utdallas.edu/~kehtar/UTD-MHAD.html) and [MMAct](https://mmact19.github.io/2019/).

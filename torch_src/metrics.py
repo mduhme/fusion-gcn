@@ -5,13 +5,13 @@ Some code is taken and modified from ignite.metrics library.
 
 import sys
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Sequence, Union
+from typing import Dict, List, Optional, Sequence, Union, Tuple
 
 import matplotlib.pyplot as plt
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-import util.visualization.confusion_matrix as cnf_vis
+import util.visualization.model_visualization as model_vis
 
 
 class Metric(ABC):
@@ -20,7 +20,7 @@ class Metric(ABC):
         self.write_to_summary_interval = 1
 
     @abstractmethod
-    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]] = None, **kwargs):
         pass
 
     @property
@@ -63,7 +63,7 @@ class SimpleMetric(ScalarMetric):
         super().__init__(name)
         self.val = 0.
 
-    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]] = None, **kwargs):
         self.val = val
 
     @property
@@ -80,7 +80,8 @@ class Mean(ScalarMetric):
         self._sum = 0.
         self._steps = 0
 
-    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]] = None, **kwargs):
+        n = kwargs["num_items"]
         self._sum += val.item() * n
         self._steps += n
 
@@ -99,7 +100,7 @@ class MultiClassAccuracy(ScalarMetric):
         self._num_correct = 0.
         self._num_examples = 0
 
-    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]] = None, **kwargs):
         y_pred, y_true = val
         indices = torch.argmax(y_pred, dim=1)
         correct = torch.eq(indices, y_true).view(-1)
@@ -122,7 +123,7 @@ class TopKAccuracy(ScalarMetric):
         self._num_correct = 0.
         self._num_examples = 0
 
-    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]] = None, **kwargs):
         y_pred, y_true = val
         sorted_indices = torch.topk(y_pred, self._k, dim=1)[1]
         expanded_y = y_true.view(-1, 1).expand(-1, self._k)
@@ -150,7 +151,7 @@ class PrecisionRecallBase(ScalarMetric, ABC):
         self._true_positives = 0
         self._positives = 0
 
-    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]] = None, **kwargs):
         y_pred, y_true = val
         num_classes = y_pred.size(1)
         indices = torch.argmax(y_pred, dim=1)
@@ -217,7 +218,7 @@ class F1MeasureMetric(ScalarMetric):
         self.recall = Recall()
         # self.f1 = Fbeta(1, precision=self.precision, recall=self.recall)
 
-    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]] = None, **kwargs):
         self.precision.update(val)
         self.recall.update(val)
 
@@ -240,9 +241,7 @@ class VisualMetric(Metric):
         pass
 
     def _to_summary(self, summary: SummaryWriter, epoch: int):
-        fig = self.get_figure()
-        summary.add_figure(self.name, fig, epoch)
-        plt.close(fig)
+        summary.add_figure(self.name, self.get_figure(), epoch, close=True)
 
 
 class ConfusionMatrix(VisualMetric):
@@ -256,7 +255,7 @@ class ConfusionMatrix(VisualMetric):
         self.confusion_matrix = torch.zeros(self.num_classes, self.num_classes, dtype=torch.int32)
         self._num_samples = 0
 
-    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]] = None, **kwargs):
         y_pred, y_true = val
         self._num_samples += len(y_pred)
         y_pred = torch.argmax(y_pred, dim=1)
@@ -280,7 +279,7 @@ class ConfusionMatrix(VisualMetric):
         self._num_samples = 0
 
     def get_figure(self) -> plt.Figure:
-        return cnf_vis.create_figure(self.value.numpy(), self.class_labels)
+        return model_vis.create_confusion_matrix(self.value.numpy(), self.class_labels)
 
 
 class AccuracyBarChart(VisualMetric):
@@ -292,8 +291,9 @@ class AccuracyBarChart(VisualMetric):
         self.bins = None
         self.reset()
 
-    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]], n: int = None, context: str = None):
-        self.bins[context].update(val, n, context)
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]] = None, **kwargs):
+        context = kwargs["context"]
+        self.bins[context].update(val, context)
 
     @property
     def value(self):
@@ -310,9 +310,129 @@ class AccuracyBarChart(VisualMetric):
         }
 
     def get_figure(self) -> plt.Figure:
-        return cnf_vis.create_bar_chart({k: v.numpy() for k, v in self.value.items()}, self.class_labels, [
+        return model_vis.create_bar_chart({k: v.numpy() for k, v in self.value.items()}, self.class_labels, [
             "Accuracy (Training)", "Accuracy (Validation)"
         ])
+
+
+class GlobalDynamicAdjacency(VisualMetric):
+    """
+    Visualization of dynamic adjacency matrix B from AGCN model
+    """
+
+    def __init__(self, name: str = "DynamicAdjacency", parameter_name: str = "adj_b", labels=None):
+        super().__init__(name)
+        self.model = None
+        self.parameter_name = parameter_name
+        self.labels = labels
+
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]] = None, **kwargs):
+        self.model = kwargs["model"]
+
+    @property
+    def value(self) -> torch.Tensor:
+        dynamic_matrices = [param.cpu().detach() for name, param in self.model.named_parameters() if
+                            self.parameter_name in name]
+        dynamic_matrices = torch.stack(dynamic_matrices)
+        # shape = (num_layers, num_partitions [= 3 for spatial partitioning strategy], num_graph_nodes, num_graph_nodes)
+        return dynamic_matrices
+
+    def get_figure(self) -> plt.Figure:
+        return model_vis.create_image_visualization(self.value.numpy(), self.labels, row_tag="Layer",
+                                                    col_tag="Partition")
+
+    def reset(self):
+        self.model = None
+
+
+class DataDependentAdjacency(Metric):
+    """
+    Visualization of dynamic adjacency matrix C from AGCN model
+    """
+
+    def __init__(self, name: str = "DynamicAdjacency", module_name: str = "gcn", labels=None, target_indices=None):
+        super().__init__(name)
+        self.module_name = module_name
+        self.labels = labels
+        self.target_indices = target_indices
+        self.indices = []
+        self.matrices = {}
+
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]] = None, **kwargs):
+        model = kwargs["model"]
+        self.indices.extend(kwargs["indices"])
+        for name, module in model.named_modules():
+            if self.module_name in name and hasattr(module, "adj_c"):
+                # name must start like l1.gcn1.
+                end = name.rindex(self.module_name) - 1
+                start = name.rfind(".l", 0, end) + 2
+                layer = int(name[start:end])
+                if layer not in self.matrices:
+                    self.matrices[layer] = []
+                self.matrices[layer].append(torch.transpose(torch.stack(module.adj_c).cpu().detach(), 0, 1))
+
+    @property
+    def value(self) -> List[torch.Tensor]:
+        matrices = [torch.cat(v) for v in self.matrices.values()]
+        matrices = torch.transpose(torch.stack(matrices), 0, 1)
+        matrices = [t[1] for t in filter(lambda x: (not self.target_indices or x[0] in self.target_indices),
+                                         zip(self.indices, matrices))]
+        return matrices
+
+    def _to_summary(self, summary: SummaryWriter, epoch: int):
+        for index, matrix in zip(self.target_indices, self.value):
+            f = model_vis.create_image_visualization(matrix.numpy(), self.labels, row_tag="Layer", col_tag="Partition")
+            summary.add_figure(f"{self.name}_{index}", f, epoch, close=True)
+
+    def reset(self):
+        self.indices = []
+        self.matrices = {}
+
+
+class MisclassifiedSamplesList(Metric):
+    def __init__(self, name: str = "SampleList", sample_labels: Optional[Sequence[str]] = None,
+                 class_labels: Optional[Sequence[str]] = None):
+        super().__init__(name)
+        self.sample_labels = sample_labels
+        self.class_labels = class_labels
+        self.prediction = []
+        self.ground_truth = []
+        self.indices = []
+
+    def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]] = None, **kwargs):
+        y_pred, y_true = val
+        y_pred = torch.argmax(y_pred, dim=1)
+        self.prediction.extend(y_pred.cpu())
+        self.ground_truth.extend(y_true.cpu())
+        self.indices.extend(kwargs["indices"])
+
+    @property
+    def value(self) -> List[tuple]:
+        return sorted(filter(lambda x: x[1] != x[2], zip(self.indices, self.prediction, self.ground_truth)),
+                      key=lambda x: x[0])
+
+    def reset(self):
+        self.prediction = []
+        self.ground_truth = []
+        self.indices = []
+
+    def _to_summary(self, summary: SummaryWriter, epoch: int):
+        def get_sample_label(sample):
+            if self.sample_labels is not None:
+                sample_files = "<br />".join(map(str, self.sample_labels[sample]))
+                return f"Index: {sample}<br />{sample_files}"
+            return str(sample)
+
+        def get_class_label(sample):
+            if self.class_labels is not None:
+                return f"{self.class_labels[sample]} ({sample})"
+            return str(sample)
+
+        text = "  \n".join(
+            f"| {get_sample_label(sample[0])} | {get_class_label(sample[1])} | {get_class_label(sample[2])} |" for
+            sample in self.value)
+        text = "| Sample | Prediction | Ground Truth |  \n| --- | --- | --- |  \n" + text
+        summary.add_text(self.name, text, epoch)
 
 
 class MetricsContainer:
@@ -395,27 +515,31 @@ class MetricsContainer:
         for m in self._metrics:
             m.reset()
 
-    def update_training(self, loss: torch.Tensor, output: Sequence[torch.Tensor], n: int):
+    def update_training(self, loss: torch.Tensor, output: Tuple[torch.Tensor, torch.Tensor], model: torch.nn.Module,
+                        indices: torch.Tensor):
         """
         Update training loss and metrics.
         :param loss: current loss
         :param output: Must be Tensor (y_pred, y_true)
-        :param n: Number of steps (batch_size or gradient accumulation steps)
+        :param model: network model
+        :param indices: data sample indices for current batch
         """
-        self.training_loss.update(loss, n)
+        self.training_loss.update(loss, num_items=len(output[1]))
         for m in self._training_metrics:
-            m.update(output, n, "train")
+            m.update(output, context="train", model=model, indices=indices)
 
-    def update_validation(self, loss: torch.Tensor, output: Sequence[torch.Tensor], n: int):
+    def update_validation(self, loss: torch.Tensor, output: Tuple[torch.Tensor, torch.Tensor], model: torch.nn.Module,
+                          indices: torch.Tensor):
         """
         Update validation loss and metrics.
         :param loss: current loss
         :param output: Must be Tensor (y_pred, y_true)
-        :param n: Number of steps (batch_size or gradient accumulation steps)
+        :param model: network model
+        :param indices: data sample indices for current batch
         """
-        self.validation_loss.update(loss, n)
+        self.validation_loss.update(loss, num_items=len(output[1]))
         for m in self._validation_metrics:
-            m.update(output, n, "val")
+            m.update(output, context="val", model=model, indices=indices)
 
     def format_training(self) -> str:
         """

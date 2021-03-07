@@ -1,6 +1,7 @@
 from typing import Optional, Sequence, Union
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,7 +9,35 @@ import pandas as pd
 import seaborn as sn
 
 
-def create_figure(mat: Union[pd.DataFrame, np.ndarray], class_labels: Optional[Sequence[str]] = None) -> plt.Figure:
+def create_image_visualization(mat: np.ndarray, labels: Optional[Sequence[str]] = None, row_tag: str = "",
+                               col_tag: str = "") -> plt.Figure:
+    image_rows, image_cols = mat.shape[:2]
+
+    if labels:
+        labels = list(labels)
+        for i in range(len(labels), mat.shape[-1]):
+            labels.append(f"N{i}")
+        labels = labels[:mat.shape[-1]]
+
+    fig, axes = plt.subplots(image_rows, image_cols, figsize=(image_cols * 6, image_rows * 6))
+    for r in range(image_rows):
+        for c in range(image_cols):
+            ax = axes[r, c]
+            val = mat[r, c]
+            if row_tag or col_tag:
+                ax.set_title(f"{row_tag} {r}, {col_tag} {c}")
+            ax.set_aspect(1.0)
+            plot_labels = labels is not None
+            if plot_labels:
+                val = pd.DataFrame(val, index=labels, columns=labels)
+            # noinspection PyUnresolvedReferences
+            sn.heatmap(val, annot=False, cbar=True, cmap=plt.cm.Greys_r, xticklabels=plot_labels,
+                       yticklabels=plot_labels, ax=ax)
+    return fig
+
+
+def create_confusion_matrix(mat: Union[pd.DataFrame, np.ndarray],
+                            class_labels: Optional[Sequence[str]] = None) -> plt.Figure:
     if type(mat) is np.ndarray:
         mat = pd.DataFrame(mat, index=class_labels, columns=class_labels)
 

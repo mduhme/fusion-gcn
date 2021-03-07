@@ -62,6 +62,7 @@ class SpatialGraphConv(nn.Module):
         self.adj_b = nn.Parameter(torch.from_numpy(adj.astype(np.float32)))
         nn.init.constant_(self.adj_b, 1e-6)
         self.register_buffer("adj_a", torch.from_numpy(adj.astype(np.float32)))
+        self.adj_c = [None] * self.num_subsets
 
         self.conv_a = nn.ModuleList()
         self.conv_b = nn.ModuleList()
@@ -103,6 +104,7 @@ class SpatialGraphConv(nn.Module):
             A1 = self.conv_a[i](x).permute(0, 3, 1, 2).contiguous().view(N, V, self.inter_channels * T)
             A2 = self.conv_b[i](x).view(N, self.inter_channels * T, V)
             A1 = self.soft(torch.matmul(A1, A2) / A1.size(-1))  # N V V
+            self.adj_c[i] = A1
             A1 = A1 + adj[i]
             A2 = x.view(N, C * T, V)
             z = self.conv_d[i](torch.matmul(A2, A1).view(N, C, T, V))

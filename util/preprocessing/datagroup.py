@@ -2,6 +2,7 @@ import contextlib
 import copy
 import itertools
 import os
+import pickle
 from sys import stdout
 from typing import Tuple, Dict, Union, Iterable, Optional, Sequence, Type
 
@@ -184,6 +185,13 @@ class DataGroup:
 
             # Map modality to a list of files defined by the split
             files = {k: self.data.iloc[sample_indices][k] for k in required_loaders}
+
+            if out_path:
+                with open(os.path.join(out_path, f"{split_name}_files.pkl"), "wb") as meta_data_file:
+                    sample_files = list(zip(*files.values()))
+                    common_prefix = os.path.commonprefix([item for sublist in sample_files for item in sublist])
+                    sample_files = [tuple(map(lambda x: x[len(common_prefix):], p)) for p in sample_files]
+                    pickle.dump(sample_files, meta_data_file)
 
             # Map modality to a generator that loads samples from files
             input_sample_iter = {k: required_loaders[k].load_samples(files[k]) for k in required_loaders}

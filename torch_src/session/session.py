@@ -106,14 +106,14 @@ class Session:
         # save_configuration(self._base_config, self.config_path)
 
     def build_metrics(self, num_classes: int, class_labels=None, k: int = 5,
-                      additional_metrics: dict = None) -> MetricsContainer:
+                      additional_metrics: list = None) -> MetricsContainer:
         """
         Build different metrics. Metrics that are always included are learning rate, loss and accuracy.
 
         :param num_classes: Number of classes for the current dataset
         :param class_labels: A list of length 'num_classes' with class labels
         :param k: k for top-k accuracy; if k <= 1: don't include top-k accuracy
-        :param additional_metrics: additional metrics as str: metric_type dictionary
+        :param additional_metrics: additional metrics in a list
         :return: container that holds all metrics
         """
         # https://medium.com/data-science-in-your-pocket/calculating-precision-recall-for-multi-class-classification-9055931ee229
@@ -151,11 +151,7 @@ class Session:
             metrics_list.append(TopKAccuracy(f"validation_top{k}_accuracy", k=k))
 
         if additional_metrics:
-            for metric_name in additional_metrics:
-                c = additional_metrics[metric_name]
-                if not is_eval:
-                    metrics_list.append(c(f"training_{metric_name}"))
-                metrics_list.append(c(f"validation_{metric_name}"))
+            metrics_list.extend(additional_metrics)
 
         if not is_eval:
             metrics_list.append(SimpleMetric("lr"))
@@ -180,7 +176,8 @@ class Session:
             # Clear gradients for each parameter
             optimizer.zero_grad()
             # Compute model and calculate loss
-            batch_processor.process_single_batch(model, loss_function, features, label, metrics.update_training)
+            batch_processor.process_single_batch(model, loss_function, features, label, indices,
+                                                 metrics.update_training)
             # Update weights
             batch_processor.run_optimizer_step(optimizer)
             # Update progress bar
@@ -201,7 +198,7 @@ class Session:
                 else:
                     features = features_batch.float().cuda()
                 label = label_batch.long().cuda()
-                batch_processor.process_single_batch(model, loss_function, features, label,
+                batch_processor.process_single_batch(model, loss_function, features, label, indices,
                                                      metrics.update_validation)
                 # Update progress bar
                 if progress:

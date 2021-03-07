@@ -12,7 +12,7 @@ class BatchProcessor:
 
     @abc.abstractmethod
     def process_single_batch(self, model: torch.nn.Module, loss_function: torch.nn.Module, features: torch.Tensor,
-                             label: torch.Tensor, update_metrics_function=None):
+                             label: torch.Tensor, indices: torch.Tensor, update_metrics_function=None):
         pass
 
     def run_optimizer_step(self, optimizer):
@@ -37,6 +37,7 @@ class DefaultBatchProcessor(BatchProcessor):
                              loss_function: torch.nn.Module,
                              features: Union[torch.Tensor, Dict[str, torch.Tensor]],
                              label: torch.Tensor,
+                             indices: torch.Tensor,
                              update_metrics_function=None):
         """
         Compute and calculate the loss for a single batch. If training, propagate the loss to all parameters.
@@ -45,6 +46,7 @@ class DefaultBatchProcessor(BatchProcessor):
         :param loss_function: function to compute loss
         :param features: features tensor of len batch_size or multiple tensors in a dictionary, one for each modality
         :param label: label tensor of len batch_size
+        :param indices: data sample indices for current batch
         :param update_metrics_function: If not None: function that takes
          (loss, (y_pred, y_true), len(y_true)) to update metrics
         """
@@ -55,7 +57,7 @@ class DefaultBatchProcessor(BatchProcessor):
             self._step_function.backward(loss)
 
         if update_metrics_function:
-            update_metrics_function(loss, (y_pred, label), len(label))
+            update_metrics_function(loss, (y_pred, label), model, indices)
 
 
 class GradientAccumulationBatchProcessor(BatchProcessor):
@@ -70,6 +72,7 @@ class GradientAccumulationBatchProcessor(BatchProcessor):
                              loss_function: torch.nn.Module,
                              features: Union[torch.Tensor, Dict[str, torch.Tensor]],
                              label: torch.Tensor,
+                             indices: torch.Tensor,
                              update_metrics_function=None):
         """
         Compute and calculate the loss for a single batch in small steps using gradient accumulation.
@@ -79,6 +82,7 @@ class GradientAccumulationBatchProcessor(BatchProcessor):
         :param loss_function:  function to compute loss
         :param features: features tensor of len batch_size or multiple tensors in a dictionary, one for each modality
         :param label: label tensor of len batch_size
+        :param indices: data sample indices for current batch
         :param update_metrics_function: If not None: function that takes
          (loss, (y_pred, y_true), len(y_true)) to update metrics
         """
@@ -97,7 +101,7 @@ class GradientAccumulationBatchProcessor(BatchProcessor):
                 self._step_function.backward(loss)
 
             if update_metrics_function:
-                update_metrics_function(loss, (y_pred, y_true), len(y_true))
+                update_metrics_function(loss, (y_pred, y_true), model, indices[start:end])
 
 
 def get_batch_processor_from_config(base_args, config: dict):

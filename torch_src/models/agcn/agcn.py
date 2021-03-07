@@ -61,6 +61,7 @@ class unit_gcn(nn.Module):
         nn.init.constant_(self.PA, 1e-6)
         self.A = Variable(torch.from_numpy(A.astype(np.float32)), requires_grad=False)
         self.num_subset = num_subset
+        self.adj_c = [None] * num_subset
 
         self.conv_a = nn.ModuleList()
         self.conv_b = nn.ModuleList()
@@ -101,6 +102,7 @@ class unit_gcn(nn.Module):
             A1 = self.conv_a[i](x).permute(0, 3, 1, 2).contiguous().view(N, V, self.inter_c * T)
             A2 = self.conv_b[i](x).view(N, self.inter_c * T, V)
             A1 = self.soft(torch.matmul(A1, A2) / A1.size(-1))  # N V V
+            self.adj_c[i] = A1
             A1 = A1 + A[i]
             A2 = x.view(N, C * T, V)
             z = self.conv_d[i](torch.matmul(A2, A1).view(N, C, T, V))

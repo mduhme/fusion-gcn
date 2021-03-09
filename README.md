@@ -67,7 +67,7 @@ with `<dataset>` being either *utd_mhad* or *mmact*.
 > **Important** :information_source:  
 > - Working directory should always be `<project directory>` (where this file is located).  
 > - Running in PyCharm: Mark directory 'torch_src' as *Sources Root*  
-> - Running in command line: Add `<project directory>` to PYTHONPATH  
+> - Running in command line: Add <project directory> to PYTHONPATH (`` export PYTHONPATH=`pwd` ``)
 
 1. Preprocess dataset:  
 ```

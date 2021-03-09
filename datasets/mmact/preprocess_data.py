@@ -2,15 +2,17 @@ import argparse
 import os
 from typing import Sequence
 
+import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 from tqdm import tqdm
 
+import datasets.mmact.constants as constants
 import datasets.mmact.io as io
 from datasets.mmact.config import get_preprocessing_setting
-from datasets.mmact.constants import *
 from util.dynamic_import import import_class
 from util.merge import deep_merge_dictionary
+from util.preprocessing.data_loader import SequenceStructure, NumpyLoader
 from util.preprocessing.datagroup import DataGroup
 
 
@@ -204,14 +206,14 @@ def preprocess(cf: argparse.Namespace):
     # dataset splits
     if cf.split == "cross_subject":
         splits = {
-            "train": cross_subject_training,
-            "val": cross_subject_test
+            "train": constants.cross_subject_training,
+            "val": constants.cross_subject_test
         }
         split_type = "subject"
     elif cf.split == "cross_view":
         splits = {
-            "train": cross_view_training,
-            "val": cross_view_test
+            "train": constants.cross_view_training,
+            "val": constants.cross_view_test
         }
         split_type = "cam"
     else:
@@ -223,12 +225,14 @@ def preprocess(cf: argparse.Namespace):
     if "kwargs" not in setting:
         setting["kwargs"] = {}
     setting["kwargs"]["num_bodies"] = 2
+    if "imu_num_signals" in setting["kwargs"]:
+        setting["kwargs"]["imu_num_signals"] = len(cf.wearable_sensors)
 
     if cf.debug:
         setting["kwargs"].update({
             "debug": True,
             # "skeleton_edges": skeleton_edges,
-            "actions": actions,
+            "actions": constants.actions,
             # "skeleton_joint_labels": skeleton_joints
         })
 
@@ -253,9 +257,13 @@ def preprocess(cf: argparse.Namespace):
         modalities.append((io.rgb_loader, rgb_data_files))
     if "inertial" in setting["input"]:
         # repeat signal data for every camera if view-dependent modalities are also loaded
-        repeat_view = num_views if ("rgb" in setting["input"] or "skeleton" in setting["input"]) else 0
+        repeat_view = constants.num_views if ("rgb" in setting["input"] or "skeleton" in setting["input"]) else 0
         inertial_data_files = io.get_files(os.path.join(cf.in_path, "inertial_intermediate"), repeat_view=repeat_view)
-        modalities.append((io.inertial_loader, inertial_data_files))
+        inertial_structure = SequenceStructure(constants.inertial_max_sequence_length,
+                                               (constants.inertial_max_sequence_length, 3 * len(cf.wearable_sensors)),
+                                               np.float32)
+        inertial_loader = NumpyLoader("inertial", inertial_structure)
+        modalities.append((inertial_loader, inertial_data_files))
 
     modalities = filter_file_list(modalities)
 

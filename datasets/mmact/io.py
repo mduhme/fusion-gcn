@@ -64,10 +64,7 @@ def get_classes(data_path: str) -> Sequence[str]:
 
 skeleton_sequence_structure = SequenceStructure(constants.skeleton_rgb_max_sequence_length, constants.skeleton_shape,
                                                 np.float32)
-inertial_sequence_structure = SequenceStructure(constants.inertial_max_sequence_length, constants.inertial_shape,
-                                                np.float32)
 rgb_sequence_structure = SequenceStructure(constants.skeleton_rgb_max_sequence_length, constants.rgb_shape, np.uint8)
 
 skeleton_loader = NumpyLoader("skeleton", skeleton_sequence_structure)
-inertial_loader = NumpyLoader("inertial", inertial_sequence_structure)
 rgb_loader = RGBVideoLoader("rgb", rgb_sequence_structure)

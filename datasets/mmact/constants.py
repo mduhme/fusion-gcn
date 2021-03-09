@@ -15,7 +15,6 @@ acc_phone_max_sequence_length = 5946
 
 # (num bodies, sequence length, num nodes, num channels)
 skeleton_shape = (skeleton_rgb_max_sequence_length, 18, 2, 2)
-inertial_shape = (inertial_max_sequence_length, 12)
 rgb_shape = (skeleton_rgb_max_sequence_length, 1080, 1920, 3)
 
 skeleton_center_joint = 1  # this is for COCO skeleton (neck)

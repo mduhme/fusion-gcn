@@ -293,7 +293,7 @@ class AccuracyBarChart(VisualMetric):
 
     def update(self, val: Union[float, torch.Tensor, Sequence[torch.Tensor]] = None, **kwargs):
         context = kwargs["context"]
-        self.bins[context].update(val, context)
+        self.bins[context].update(val, **kwargs)
 
     @property
     def value(self):

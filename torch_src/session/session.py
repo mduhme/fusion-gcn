@@ -137,8 +137,8 @@ class Session:
         conf_b.write_to_summary_interval = 1 if is_eval else 5
 
         if not is_eval:
-            metrics_list.append(conf_a)
-        metrics_list.append(conf_b)
+            metrics_list.append(conf_b)
+        metrics_list.append(conf_a)
 
         if not is_eval:
             chart = AccuracyBarChart(num_classes, "train_val_diff", class_labels)

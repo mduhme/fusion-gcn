@@ -31,6 +31,11 @@ def get_configuration() -> argparse.Namespace:
     parser.add_argument("--shrink", default=3, type=int,
                         help="Shrink sequence length by this factor. "
                              "E.g. skeleton/rgb are captured with 30FPS -> Reduce to 10FPS")
+    parser.add_argument("-w", "--wearable_sensors", nargs="+",
+                        default=("gyro_clip", "orientation_clip", "acc_phone_clip", "acc_watch_clip"),
+                        help="Which wearable sensor modalities to use. "
+                             "The order is important: Resample the length of all other sensor modalities "
+                             "to that of the first element in this list.")
     parser.add_argument("--debug", action="store_true", help="debug mode")
     return parser.parse_args()
 
@@ -63,7 +68,7 @@ def merge_signal_data(root_path: str,
                 for line in f.readlines():
                     line = line.strip()
                     if line:
-                        invalid_files.add(os.path.join(m, line))
+                        invalid_files.add(os.path.join(m, os.path.normpath(line)))
 
     # retrieve all file paths
     files = {
@@ -278,6 +283,6 @@ def preprocess(cf: argparse.Namespace):
 
 if __name__ == "__main__":
     conf = get_configuration()
-    merge_signal_data(conf.in_path)
+    merge_signal_data(conf.in_path, conf.wearable_sensors)
     os.makedirs(conf.out_path, exist_ok=True)
     preprocess(conf)

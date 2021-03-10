@@ -47,9 +47,9 @@ ROOT
 |   |   └───MMAct
 │   |   └───UTD-MHAD
 ```
-3. Include 'invalid_files.txt' for MMAct and OpenPose skeletons for both datasets (BODY_25 for UTD-MHAD and COCO for MMAct) are required for both datasets.
-   They can be downloaded [here](https://agas.uni-koblenz.de/margcn/) or [here](https://drive.google.com/drive/folders/1q_tSzk7EspZwzDwHF925_XOC3QXQqW7n?usp=sharing).
-   or generated using tools in `<project directory>/tools/openpose/gen_openpose_skeletons.py`
+3. Include 'invalid_files.txt' for MMAct and OpenPose skeletons for both datasets (BODY_25 for UTD-MHAD and COCO for MMAct).
+   Some files can be downloaded [here](https://drive.google.com/drive/folders/1q_tSzk7EspZwzDwHF925_XOC3QXQqW7n?usp=sharing).
+   Skeletons can be generated using tools in `<project directory>/tools/openpose/gen_openpose_skeletons.py`
 ```
 ./tools/openpose/gen_openpose_skeletons.py
 -d <dataset>
@@ -57,6 +57,9 @@ ROOT
 --openpose_python_pyth=<path_to_openpose_python_files>
 ```
 with `<dataset>` being either *utd_mhad* or *mmact*.  
+Each skeleton joint has 3 values: x, y and accuracy. Remove accuracy.  
+Example for MMAct: A single generated skeleton sequence has shape `(sequence_length, num_joints, (x, y, accuracy) [=3], num_bodies [=2]) -> Reshape to (sequence_length, num_joints, (x, y) [=2], num_bodies [=2])`.  
+MMAct contains actions performed by more than a single person. If action is performed by only a single person then `(:, :, :, 0) == (:, :, :, 1)` is true. For these cases the second skeleton `(:, :, :, 1)` can be filled with `0`.
 
 4. Create a new python environment (Code tested for Python 3.8.5 and CUDA 10.2)  
    

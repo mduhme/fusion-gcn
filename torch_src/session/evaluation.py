@@ -1,5 +1,4 @@
 import os
-import pickle
 
 import torch
 from torch.utils.data import DataLoader
@@ -10,8 +9,7 @@ from dataset import MultiModalDataset
 from progress import ProgressLogger
 from session.procedures.batch_train import get_batch_processor_from_config
 from session.session import Session
-from metrics import F1MeasureMetric, GlobalDynamicAdjacency, DataDependentAdjacency, MisclassifiedSamplesList
-from util.dynamic_import import import_dataset_constants
+from metrics import F1MeasureMetric
 
 
 class EvaluationSession(Session):
@@ -57,20 +55,20 @@ class EvaluationSession(Session):
         model.load_state_dict(torch.load(eval_session_path))
         progress = self._build_logging(len(validation_data))
 
-        skeleton_joints, = import_dataset_constants(self._base_config.dataset, ["skeleton_joints"])
-        with open(os.path.join(self._base_config.input_data[0][0], "val_files.pkl"), "rb") as f:
-            sample_labels = pickle.load(f)
+        # skeleton_joints, = import_dataset_constants(self._base_config.dataset, ["skeleton_joints"])
+        # with open(os.path.join(self._base_config.input_data[0][0], "val_files.pkl"), "rb") as f:
+        #     sample_labels = pickle.load(f)
 
         metrics = self.build_metrics(num_classes, class_labels=self._base_config.class_labels, additional_metrics=[
-            MisclassifiedSamplesList("validation-sample-list", sample_labels, self._base_config.class_labels),
+            # MisclassifiedSamplesList("validation-sample-list", sample_labels, self._base_config.class_labels),
             F1MeasureMetric("validation-f1-measure"),
-            GlobalDynamicAdjacency("validation_global_dynamic_adjacency", "adj_b", labels=skeleton_joints),
+            # GlobalDynamicAdjacency("validation_global_dynamic_adjacency", "adj_b", labels=skeleton_joints),
             # target_indices
             # 177 - 20_s2_t2_skeleton.mat - knock (18) / catch (19)
             # 345 - 4_s6_t4_skeleton.mat - arm_cross (5) / clap (3)
             # 386 - 7_s4_t1_skeleton.mat - tennis_serve (16) / basketball_shoot (6)
-            DataDependentAdjacency("validation_data_dependent_adjacency", labels=skeleton_joints,
-                                   target_indices=[177, 345, 386])
+            # DataDependentAdjacency("validation_data_dependent_adjacency", labels=skeleton_joints,
+            #                        target_indices=[177, 345, 386])
         ])
 
         if progress:

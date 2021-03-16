@@ -1,15 +1,16 @@
 import os
 
+import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
 import torch_util
 from config import fill_model_config
 from dataset import MultiModalDataset
+from metrics import F1MeasureMetric
 from progress import ProgressLogger
 from session.procedures.batch_train import get_batch_processor_from_config
 from session.session import Session
-from metrics import F1MeasureMetric
 
 
 class EvaluationSession(Session):
@@ -83,6 +84,9 @@ class EvaluationSession(Session):
             progress.begin_epoch_mode(0)
 
         Session.validate_epoch(batch_processor, model, loss_function, validation_data, progress, metrics, 0)
+
+        # Save confusion matrix
+        np.save(os.path.join(self.out_path, "validation-confusion.npy"), metrics["validation_confusion"].value.numpy())
 
         if progress:
             progress.end_epoch(metrics)

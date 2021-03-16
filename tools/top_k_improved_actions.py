@@ -3,6 +3,7 @@ import pandas as pd
 
 from util.dynamic_import import import_dataset_constants
 
+best = False
 k = 5
 a = np.load(r"..\models\mmargcn\MMAct\evaluation_2021_03_08-20_18_51_agcn_cs\validation-confusion.npy")
 b = np.load(r"..\models\mmargcn\MMAct\evaluation_2021_03_16-10_29_56_augment_v1_cs_single\validation-confusion.npy")
@@ -15,6 +16,12 @@ a_acc = np.diagonal(a) / np.sum(a, axis=1)
 b_acc = np.diagonal(b) / np.sum(b, axis=1)
 diff = b_acc - a_acc
 idx = np.argsort(diff)[::-1]
+
+if best:
+    idx = idx[:k]
+else:
+    idx = idx[-k:]
+    idx = idx[::-1]
 
 a_k = a_acc[idx][:k]
 b_k = b_acc[idx][:k]

@@ -140,10 +140,10 @@ class Session:
             metrics_list.append(conf_b)
         metrics_list.append(conf_a)
 
-        if not is_eval:
-            chart = AccuracyBarChart(num_classes, "train_val_diff", class_labels)
-            chart.write_to_summary_interval = 5
-            metrics_list.append(chart)
+        # if not is_eval:
+        #     chart = AccuracyBarChart(num_classes, "train_val_diff", class_labels)
+        #     chart.write_to_summary_interval = 5
+        #     metrics_list.append(chart)
 
         if k > 1:
             if not is_eval:

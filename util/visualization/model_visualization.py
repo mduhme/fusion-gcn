@@ -36,22 +36,22 @@ def create_image_visualization(mat: np.ndarray, labels: Optional[Sequence[str]] 
     return fig
 
 
-def create_confusion_matrix(mat: Union[pd.DataFrame, np.ndarray],
+def create_confusion_matrix(mat: np.ndarray,
                             class_labels: Optional[Sequence[str]] = None) -> plt.Figure:
-    if type(mat) is np.ndarray:
-        mat = pd.DataFrame(mat, index=class_labels, columns=class_labels)
-
+    mat = mat / mat.sum(axis=1, keepdims=True)
+    mat = pd.DataFrame(mat, index=class_labels, columns=class_labels)
     if len(mat) != len(mat.columns):
         raise ValueError("'mat' is not squared!")
 
     if class_labels is not None and len(class_labels) != len(mat):
         raise ValueError(f"Incorrect number of class labels provided: {len(class_labels)}/{len(mat)}")
 
-    fig = plt.figure(figsize=(12, 8))
+    mat_str = mat.applymap(lambda x: str(int(x)) if x.is_integer() else f"{x:.2f}")
+    fig = plt.figure(figsize=(14, 10))
     # noinspection PyUnresolvedReferences
-    sn.heatmap(mat, annot=True, cmap=plt.cm.Blues, cbar=False)
-    fig.get_axes()[0].set_ylabel("Ground truth")
-    fig.get_axes()[0].set_xlabel("Prediction")
+    sn.heatmap(mat, annot=mat_str, cmap=plt.cm.Blues, cbar=False, fmt="")
+    ax: plt.Axes = fig.get_axes()[0]
+    ax.tick_params(labelsize="large")
     fig.tight_layout()
     return fig
 
@@ -83,11 +83,19 @@ def create_bar_chart(bins: dict, class_labels: Optional[Sequence[str]] = None,
     df["type"] = df["type"].map(lambda i: types[i])
     df["label"] = df["label"].map(lambda i: class_labels[i])
 
-    fig = plt.figure(figsize=(14, 6))
+    fig = plt.figure(figsize=(14, 4.8))
     sn.barplot(x="label", y="value", hue="type", data=df, palette=palette)
+    plt.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower center",
+               borderaxespad=0, ncol=4, frameon=False)
 
-    fig.get_axes()[0].set_ylabel("Accuracy")
-    fig.get_axes()[0].set_xlabel("Labels")
-    plt.setp(fig.get_axes()[0].get_xticklabels(), rotation=45)
+    ax: plt.Axes = fig.get_axes()[0]
+    ax.set_ylabel("Accuracy (%)")
+    ax.set_yticks(np.arange(0, 110, 10))
+    ax.set_xticklabels(class_labels, fontdict={"fontsize": 13})
+    ax.set_axisbelow(True)
+    ax.grid(axis="y")
+    ax.set_ylim(top=100)
+    plt.setp(ax.get_xticklabels(), rotation=45, rotation_mode="anchor")
+    plt.setp(ax.get_xticklabels(), ha="right")
     fig.tight_layout()
     return fig
